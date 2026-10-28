@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "uploads": [
+    {
+      "formId": "26",
+      "componentId": "SUBSTITUA_PELO_COMPONENTE_CAPTURADO",
+      "ruleName": "SUBSTITUA_PELA_REGRA_DE_ENVIO_VALIDADA",
+      "validationRule": "",
+      "multiple": false,
+      "parameters": [
+        {
+          "name": "P_0",
+          "source": "record_id"
+        }
+      ],
+      "allowedExtensions": [
+        ".pdf",
+        ".png",
+        ".jpg"
+      ],
+      "allowedMimeTypes": [
+        "application/pdf",
+        "image/png",
+        "image/jpeg"
+      ],
+      "maxBytes": 26214400,
+      "requiresRecordId": true,
+      "refreshAfter": true
+    }
+  ]
+}

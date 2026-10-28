@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "downloads": [
+    {
+      "formId": "26",
+      "componentId": "123456",
+      "path": {
+        "source": "rule_return",
+        "ruleName": "SUBSTITUA_PELA_REGRA_VALIDADA_QUE_RETORNA_O_CAMINHO",
+        "pType": "2",
+        "parentRID": "-1",
+        "parameters": [
+          {
+            "name": "P_0",
+            "source": "record_id"
+          }
+        ]
+      },
+      "allowedPathPrefixes": [
+        "/tmp/"
+      ],
+      "allowedExtensions": [
+        ".pdf",
+        ".xlsx"
+      ],
+      "allowedMimeTypes": [
+        "application/pdf",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      ],
+      "maxBytes": 104857600,
+      "requiresRecordId": true
+    }
+  ]
+}

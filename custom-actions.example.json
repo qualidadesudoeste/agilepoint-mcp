@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "actions": [
+    {
+      "formId": "47",
+      "componentId": "1136100",
+      "ruleName": "SUBSTITUA_PELA_REGRA_CAPTURADA_EM_HOMOLOGACAO",
+      "pType": "2",
+      "parentRID": "-1",
+      "parameters": [
+        {
+          "name": "P_0",
+          "source": "component_value",
+          "componentId": "665"
+        },
+        {
+          "name": "P_1",
+          "source": "record_id"
+        }
+      ],
+      "destructive": false,
+      "requiresRecordId": true,
+      "refreshAfter": true
+    }
+  ]
+}

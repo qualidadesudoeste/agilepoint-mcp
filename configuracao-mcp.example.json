@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "agilepoint": {
+      "command": "node",
+      "args": ["C:\\CAMINHO_DO_MCP\\dist\\index.js"],
+      "env": {
+        "APF_CAPABILITIES_FILE": "C:\\CAMINHO_DO_MCP\\capabilities.json",
+        "APF_WRITE_ENABLED": "true",
+        "APF_WRITE_APPROVAL_MODE": "external",
+        "APF_AUDIT_DIR": "C:\\PASTA_PRIVADA_DO_USUARIO\\auditoria",
+        "APF_APPROVAL_DIR": "C:\\PASTA_PRIVADA_DO_USUARIO\\aprovacoes",
+        "APF_EXPORT_DIR": "C:\\PASTA_PRIVADA_DO_USUARIO\\exportacoes",
+        "APF_UPLOAD_DIR": "C:\\PASTA_PRIVADA_DO_USUARIO\\importacao"
+      }
+    }
+  }
+}

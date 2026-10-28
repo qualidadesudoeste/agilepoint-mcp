@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "roles": {
+    "desenvolvedor": [
+      {
+        "formIds": ["26"],
+        "capabilities": ["field_write", "include", "edit", "save", "cancel", "refresh", "upload", "download"]
+      }
+    ],
+    "gerente": [
+      {
+        "formIds": ["26", "47"],
+        "capabilities": ["field_write", "include", "edit", "save", "delete", "cancel", "refresh", "custom_action", "upload", "download"]
+      }
+    ]
+  }
+}

@@ -1,0 +1,22 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+playwright-report/
+test-results/
+data/
+exports/
+approvals/
+artifacts/
+*.zip
+.agilepoint-audit.jsonl
+
+# Notas locais e históricos que não integram o código distribuído.
+COBERTURA_PENDENTE.md
+INSTRUCOES_OUTRO_CHAT.md
+docs/VALIDACAO_*.md
+configuracao-gerada.json
+.agilepoint-install.json
+capabilities.json
+*.log
