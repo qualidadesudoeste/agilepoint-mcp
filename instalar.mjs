@@ -149,7 +149,7 @@ async function detectClient() {
 }
 
 async function copyRuntime(source, destination) {
-  const fileNames = ["package.json", "package-lock.json", "capabilities.json", "README.md", "LIMITACOES_CONHECIDAS.md", "KIT_APF.md", "assets/apf/FPA-MODELO.xlsx", "instalar.mjs", "Instalar.ps1", "scripts/approve.mjs", "scripts/smoke.mjs"];
+  const fileNames = ["package.json", "package-lock.json", "capabilities.json", "README.md", "LIMITACOES_CONHECIDAS.md", "KIT_APF.md", "DICA_DE_MESTRE.md", "assets/apf/FPA-MODELO.xlsx", "instalar.mjs", "Instalar.ps1", "scripts/approve.mjs", "scripts/smoke.mjs"];
   for (const entry of await fs.readdir(path.join(source, "dist"), { withFileTypes: true })) {
     if (entry.isFile() && entry.name.endsWith(".js")) fileNames.push(`dist/${entry.name}`);
   }

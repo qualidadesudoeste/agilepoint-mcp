@@ -15,6 +15,8 @@ const ALLOWED_INTERNAL_PATHS = new Set([
   "/refresh.do",
   "/search.do",
   "/upload.jsp",
+  "/uploadMultipleFiles.do",
+  "/jsRule/system_apf/webrunRules.js",
 ]);
 
 export const APPLICATION_DEVELOPER_GRID_CONTRACT = Object.freeze({
@@ -202,6 +204,7 @@ export type RepositoryCategory = keyof typeof REPOSITORY_RANKING_CONTRACT.catego
 export type CountReportKind = keyof typeof COUNT_REPORT_CONTRACTS;
 
 const GRID_CONTRACTS = Object.freeze({
+  inscricao_dica: Object.freeze({ formId: "500000386", componentId: "1136147", childFormId: "500000387", route: "/gridEdit.do" }),
   funcao: COUNT_FUNCTION_GRID_CONTRACT,
   item: FUNCTION_ITEM_GRID_CONTRACT,
   contribuicao: FUNCTION_CONTRIBUTION_GRID_CONTRACT,

@@ -2,11 +2,11 @@ import { readFile } from "node:fs/promises";
 import type { McpRole } from "./access.js";
 import type { UiOperation } from "./universal.js";
 
-export type Capability = "field_write" | "include" | "edit" | "save" | "delete" | "cancel" | "refresh" | "custom_action" | "upload" | "download";
+export type Capability = "field_write" | "include" | "edit" | "save" | "delete" | "cancel" | "refresh" | "custom_action" | "upload" | "download" | "publicar_dica_mestre";
 type Rule = { formIds: string[]; capabilities: Array<Capability | "*"> };
 type Policy = { version: 1; roles: Partial<Record<McpRole, Rule[]>> };
 
-const capabilityTypes = new Set<Capability>(["field_write", "include", "edit", "save", "delete", "cancel", "refresh", "custom_action", "upload", "download"]);
+const capabilityTypes = new Set<Capability>(["field_write", "include", "edit", "save", "delete", "cancel", "refresh", "custom_action", "upload", "download", "publicar_dica_mestre"]);
 
 export async function assertUniversalCapability(role: McpRole, formId: string | null, operations: UiOperation[], targetRefs: string[] = []): Promise<void> {
   if (!formId || !/^\d+$/.test(formId)) throw new Error("A operação universal exige um identificador estável de formulário.");

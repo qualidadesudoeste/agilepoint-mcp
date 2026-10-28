@@ -1014,7 +1014,7 @@ assert.match(specializedActionTool("26", "508"), /exportar_relatorio_contagem/);
 assert.equal(specializedActionTool("500000382", "1136078"), "exportar_relatorio_sprint");
 assert.equal(specializedActionTool("9148", "1135991"), "exportar_relatorio_acompanhamento");
 assert.equal(specializedActionTool("9146", "1135975"), "exportar_relatorio_premiacao");
-assert.equal(specializedActionTool("500000385", "1136126"), null);
+assert.equal(specializedActionTool("500000385", "1136126"), "publicar_dica_mestre");
 const previousReportDirectory = process.env.APF_EXPORT_DIR;
 process.env.APF_EXPORT_DIR = tmpdir();
 try {

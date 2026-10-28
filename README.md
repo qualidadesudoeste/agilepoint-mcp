@@ -2,13 +2,17 @@
 
 ## Baixar e instalar
 
-O pacote de instalação está na [release 1.1.2 para testes controlados](https://github.com/qualidadesudoeste/agilepoint-mcp/releases/tag/v1.1.2). Baixe o arquivo `agilepoint-mcp-1.1.2.zip`, envie à sua IA compatível com MCP local e peça **“Instale esse MCP”**. O guia de uso e as limitações acompanham o pacote. Depois de conectar o servidor, a IA solicita as credenciais individuais do AgilePoint.
+O pacote de instalação está na [release 1.2.0 para testes controlados](https://github.com/qualidadesudoeste/agilepoint-mcp/releases/tag/v1.2.0). Baixe o arquivo `agilepoint-mcp-1.2.0.zip`, envie à sua IA compatível com MCP local e peça **“Instale esse MCP”**. O guia de uso e as limitações acompanham o pacote. Depois de conectar o servidor, a IA solicita as credenciais individuais do AgilePoint.
 
 O botão **Code → Download ZIP** baixa o código-fonte, que exige instalação das dependências e compilação. Para instalação pelo usuário, use o ZIP anexado à release. Não envie credenciais para este repositório nem para issues.
 
 Para desenvolvimento, com Node.js 22 ou superior: `npm ci`, `npm test` e `npm run test:discovery`. Os testes padrão usam dados locais/sintéticos; os scripts de homologação real são separados e exigem configuração explícita. `npm run package:release` gera a distribuição de execução sem fontes, testes ou notas internas.
 
-Versão **1.1.2**. Permite que cada usuário opere, pela própria IA compatível com MCP, as telas que sua conta consegue acessar no AgilePoint/Webrun. O catálogo XML é filtrado pelo mapa de permissões atual da conta antes de liberar as ferramentas universais. A simulação valida seletores publicados depois de abrir Incluir/Alterar, sem gravar, e verifica a capacidade local antes desse POST transitório. Esta versão integra o kit de preparação de contagens APF, com cálculo determinístico de complexidade/PF, validação e planilha compatível com a importação rápida.
+Versão **1.2.0**. Permite que cada usuário opere, pela própria IA compatível com MCP, as telas que sua conta consegue acessar no AgilePoint/Webrun. O catálogo XML é filtrado pelo mapa de permissões atual da conta antes de liberar as ferramentas universais. A simulação valida seletores publicados depois de abrir Incluir/Alterar, sem gravar, e verifica a capacidade local antes desse POST transitório. Esta versão integra o kit de preparação de contagens APF e um fluxo especializado de envio de Dica de Mestre.
+
+## Dica de Mestre
+
+Use `simular_publicacao_dica_mestre` e `publicar_dica_mestre` para enviar título, descrição, Markdown obrigatório e anexos opcionais. `cancelar_publicacao_dica_mestre` descarta uma preparação ainda local; `consultar_minhas_dicas_mestre` consulta as inscrições da conta. A capacidade local `publicar_dica_mestre` é restrita ao formulário `500000385` no modelo de instalação, sem liberar ações personalizadas genéricas. A execução preserva a aprovação configurada e o processo de avaliação do AgilePoint, confere arquivos, consulta o ID da inscrição e relê a documentação. Veja [o guia e os limites de verificação](docs/DICA_DE_MESTRE.md). Os contratos foram capturados no cliente oficial; testes automatizados virtualizam o backend, sem substituir homologação de gravação real com cada perfil.
 
 ## Kit de contagem APF
 

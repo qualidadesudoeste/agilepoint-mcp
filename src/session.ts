@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { load } from "cheerio";
+import { DicaMestreEndpoint, DICA_FORM_ID, checkDicaResponse, type DicaSubmission } from "./dica-mestre.js";
 import JSON5 from "json5";
 import type { AssociationSimulation } from "./associations.js";
 import type { ApplicationDeveloperSimulation } from "./application-developers.js";
@@ -101,6 +102,45 @@ import {
 const MAIN_FORM_ID = "20";
 
 export class ApfSession {
+  masterTipEndpoint(): DicaMestreEndpoint {
+    return new DicaMestreEndpoint({ baseUrl: this.baseUrl, http: this.http,
+      open: async () => {
+        const allowed = await allowedUniversalCapabilities(currentRole(), DICA_FORM_ID);
+        if (!allowed.has("publicar_dica_mestre")) throw new Error("A publicação de Dica de Mestre não foi autorizada na política local desta instalação.");
+        return this.openAccessibleScreenDocumentHttp(`form:${DICA_FORM_ID}`);
+      },
+      submissions: () => this.masterTipSubmissionsHttp(),
+      resolveId: (row) => this.resolveMasterTipIdHttp(row),
+    });
+  }
+
+  async masterTipSubmissionsHttp(): Promise<DicaSubmission[]> {
+    const parent = await this.openAccessibleScreenDocumentHttp(`form:${DICA_FORM_ID}`);
+    if (!/form:\s*['"]500000386['"]/.test(parent.body)) throw new Error("A tela autorizada não publicou a consulta Minhas Inscrições.");
+    const url = buildInternalUrl(this.baseUrl, "/openform.do", { sys: "APF", action: "openform", formID: "500000386", mode: -1, goto: -1, filter: "", scrolling: "yes" });
+    const body = checkDicaResponse(await this.http.get(url, { Referer: parent.url }), "consultar minhas inscrições");
+    if (!/new HTMLGrid\('APF',\s*500000386,\s*1136147,/.test(body) || !/field1136144/.test(body) || !/field1136145/.test(body)) throw new Error("O contrato da grade Minhas Inscrições mudou.");
+    const grid = await this.readGridPagesHttp("500000386", "1136147", url, body, 5000);
+    if (!grid.complete) throw new Error("A consulta de inscrições está incompleta; a verificação e o envio foram bloqueados.");
+    return grid.rows.map((row, index) => ({ titulo: String(row.field1136144 ?? ""), descricao: String(row.field1136145 ?? ""), avaliacao: String(row.field1136146 ?? ""), posicao: index + 1 }));
+  }
+
+  private async resolveMasterTipIdHttp(row: DicaSubmission): Promise<string> {
+    const referer = buildInternalUrl(this.baseUrl, "/openform.do", { sys: "APF", action: "openform", formID: "500000386" });
+    const response = await this.http.get(buildGridRowEditUrl(this.baseUrl, "inscricao_dica", row.posicao), { Referer: referer });
+    try {
+      const body = checkDicaResponse(response, "identificar inscrição submetida");
+      const state = parseWebrunFormState(body);
+      const title = state.fields.find(f => f.componentId === "1136144")?.value;
+      const description = state.fields.find(f => f.componentId === "1136145")?.value;
+      const id = parseWebrunHiddenValue(body, "1493714144");
+      if (!id || !/^\d+$/.test(id) || title?.trim() !== row.titulo.trim() || description?.trim() !== row.descricao.trim()) throw new Error("A identificação da inscrição não confirmou o mesmo título/descrição. Não repita o envio.");
+      return id;
+    } finally {
+      checkDicaResponse(await this.http.get(buildGridCancelUrl(this.baseUrl, "inscricao_dica", "edit"), { Referer: referer }), "fechar identificação da inscrição");
+    }
+  }
+
   private operationQueue: Promise<void> = Promise.resolve();
   private readonly functionalityCache = new Map<string, { expiresAt: number; value: FunctionalityDetails }>();
   private screenCatalog = new Map<string, ScreenSummary>();

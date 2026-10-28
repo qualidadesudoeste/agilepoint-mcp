@@ -53,6 +53,12 @@ try {
   }
   await fs.access(path.join(destination, "assets", "apf", "FPA-MODELO.xlsx"));
   await fs.access(path.join(destination, "KIT_APF.md"));
+  await fs.access(path.join(destination, "DICA_DE_MESTRE.md"));
+  for (const name of ["consultar_minhas_dicas_mestre", "simular_publicacao_dica_mestre", "cancelar_publicacao_dica_mestre", "publicar_dica_mestre"]) {
+    assert.ok(tools.tools.some(tool => tool.name === name), `ferramenta Dica de Mestre ausente: ${name}`);
+  }
+  const installedPolicy = JSON.parse(await fs.readFile(path.join(destination, "capabilities.json"), "utf8"));
+  assert.ok(installedPolicy.roles.desenvolvedor.some(rule => rule.formIds.includes("500000385") && rule.capabilities.includes("publicar_dica_mestre")));
   const guided = await client.callTool({ name: "iniciar_contagem_guiada", arguments: { tela: "Tela de teste" } });
   assert.equal(guided.structuredContent.proxima_etapa, "completar_contexto");
   assert.equal(guided.structuredContent.cadastro_realizado, false);

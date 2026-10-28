@@ -1,4 +1,4 @@
-# Kit de contagem APF — versão 1.1.2
+# Kit de contagem APF — pacote 1.2.0
 
 O kit prepara e confere uma contagem antes de seu cadastro no AgilePoint. A IA identifica as funções a partir dos requisitos e das evidências; o MCP recebe esses dados estruturados, calcula complexidade e PF base e gera os artefatos para revisão. Ele não executa scripts enviados pela pessoa ou gerados pela IA.
 

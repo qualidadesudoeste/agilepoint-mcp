@@ -1,6 +1,6 @@
 # MCP AgilePoint — limitações conhecidas
 
-Versão **1.1.2**. O pacote está disponível para testes controlados. A cobertura pode variar conforme a tela, a operação e as permissões da conta.
+Versão **1.2.0**. O pacote está disponível para testes controlados. A cobertura pode variar conforme a tela, a operação e as permissões da conta.
 
 - A contagem guiada fornece perguntas e instruções à IA do cliente. O MCP não analisa requisitos com um modelo próprio nem força todos os clientes a executar o roteiro. A IA precisa ler as fontes, esclarecer lacunas e respeitar a aprovação configurada antes do cadastro.
 - No fluxo guiado, responsáveis e percentuais precisam estar definidos antes do cadastro. A distribuição é conferida estruturalmente, mas identidades e cobertura efetiva das funções ainda exigem consulta. A associação substitui vínculos nas funções selecionadas, exige aprovação própria e ocorre após importar. Uma falha nessa etapa pode deixar funções cadastradas sem a distribuição concluída; a IA deve informar o resultado parcial e evitar reimportação.
@@ -9,7 +9,9 @@ Versão **1.1.2**. O pacote está disponível para testes controlados. A cobertu
 - O MCP usa endpoints internos do AgilePoint/Webrun. Atualizações do sistema podem exigir ajustes no MCP.
 - A conta precisa ter acesso à tela e à operação no próprio AgilePoint. A configuração local do MCP não concede acesso no sistema.
 - As operações padrão de incluir, alterar e excluir dependem da capacidade configurada e dos controles publicados pela tela. Isso não garante suporte automático a todas as telas ou grades.
-- Botões personalizados, anexos e uploads exigem contratos específicos. Ações de Dica de Mestre, sincronização de aplicações e outros botões podem permanecer bloqueados. Peça à IA para chamar `verificar_cobertura_telas` antes de testar uma ação específica.
+- A submissão de Dica de Mestre possui ferramentas próprias, incluindo documentação e anexos de apoio. Botões de avaliação, sincronização de aplicações e outros uploads/ações personalizados continuam dependendo de contratos específicos. Peça à IA para chamar `verificar_cobertura_telas` antes de testar outra ação.
+- Os contratos de Dica de Mestre foram identificados no cliente oficial e testados com o backend virtualizado. A gravação real com cada perfil permanece pendente de homologação. A submissão mantém a avaliação do AgilePoint; não equivale a aprovação ou publicação imediata no catálogo.
+- Arquivos de apoio da dica são conferidos no lote de envio antes de submeter. A vinculação persistente final dos anexos não possui consulta independente homologada. Falhas após uploads podem deixar arquivos temporários no servidor; a auditoria privada conserva o GUID/etapa para reconciliação, e o MCP não chama exclusões não homologadas. Cancelar preparação local não desfaz execuções enviadas.
 - Aprovar apenas escrevendo “aprovado” na conversa não conclui a aprovação externa. Siga o procedimento do `README.md` e use o ID da simulação.
 - O ranking do repositório reproduz as notas e a ordem retornadas pelo AgilePoint. O MCP não calcula a fórmula nem define o desempate.
 - Uma falha de conexão durante uma gravação pode deixar o resultado incerto. Não repita automaticamente: consulte o registro no AgilePoint ou pelo MCP e confira o que foi persistido antes de solicitar nova operação.

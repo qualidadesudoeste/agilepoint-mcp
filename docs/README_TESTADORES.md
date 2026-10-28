@@ -1,6 +1,6 @@
 # MCP AgilePoint — instalação e uso
 
-Versão **1.1.2** — inclui contagem guiada com distribuição de desenvolvedores, validação e geração de planilhas APF. Envie este ZIP à sua IA e escreva:
+Versão **1.2.0** — inclui envio de Dica de Mestre com documentação e anexos, além do kit APF e da contagem guiada. Envie este ZIP à sua IA e escreva:
 
 > Instale esse MCP
 
@@ -39,6 +39,14 @@ Com o MCP conectado, informe suas credenciais individuais quando a IA solicitar.
 Cada processo MCP usa uma conta. Para trocar de conta, reinicie o processo MCP e autentique novamente. A instalação e suas pastas privadas são individuais.
 
 Este MCP consulta informações e executa as operações já suportadas pelo pacote. Você pode pedir: “Liste as telas disponíveis para minha conta”, “Consulte minhas contagens” ou “Mostre as funções da contagem de ID ...”. O AgilePoint continua definindo as telas e operações às quais sua conta tem acesso. A cobertura varia por tela e ação; consulte `LIMITACOES_CONHECIDAS.md` para entender os botões que podem estar bloqueados.
+
+## Enviar uma Dica de Mestre
+
+Peça: **“Quero enviar uma Dica de Mestre com este título, esta descrição e a documentação Markdown anexada. Inclua estes arquivos de apoio e mostre a prévia antes de enviar.”** A IA deve usar o fluxo especializado de simulação e publicação, sem clicar genericamente em Incluir Nova. Título, descrição e documentação são obrigatórios; anexos de apoio são opcionais. A aprovação configurada é mantida e o MCP confere a inscrição e a documentação após enviar.
+
+O resultado é uma inscrição submetida ao processo de avaliação do AgilePoint. O MCP não concede aprovação nem força publicação no catálogo. A preparação pode ser cancelada sem criar registros; uma execução já enviada ou incerta exige consulta e reconciliação. Consulte `DICA_DE_MESTRE.md` para limites, formatos e tratamento de falhas.
+
+Após instalar a atualização, reinicie a conexão MCP e peça `verificar_conexao`: a versão informada deve ser **1.2.0**. Se o cliente mantiver a conexão antiga registrada, desabilite-a após conferir a nova para evitar usar ferramentas de uma versão anterior. A configuração padrão 1.2.0 inclui a capacidade específica do formulário; políticas personalizadas precisam autorizá-la explicitamente.
 
 ## Preparar uma contagem com o kit APF
 

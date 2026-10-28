@@ -1,5 +1,8 @@
 // Only actions whose equivalent endpoint workflow has been independently validated belong here.
 const specializedActions: Readonly<Record<string, string>> = {
+  "500000385:1136122": "simular_publicacao_dica_mestre / publicar_dica_mestre",
+  "500000385:1136126": "publicar_dica_mestre",
+  "500000385:1136135": "cancelar_publicacao_dica_mestre (preparação local)",
   "26:1135976": "simular_importacao_rapida / importar_contagem_rapida",
   "26:808": "exportar_relatorio_contagem (analitico)",
   "26:508": "exportar_relatorio_contagem (pdf)",

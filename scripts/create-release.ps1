@@ -30,6 +30,7 @@ try {
     'README.md' = 'docs/README_TESTADORES.md'
     'LIMITACOES_CONHECIDAS.md' = 'docs/LIMITACOES_TESTADORES.md'
     'KIT_APF.md' = 'docs/KIT_APF.md'
+    'DICA_DE_MESTRE.md' = 'docs/DICA_DE_MESTRE.md'
     'assets/apf/FPA-MODELO.xlsx' = 'assets/apf/FPA-MODELO.xlsx'
     'Instalar.ps1' = 'Instalar.ps1'
     'instalar.mjs' = 'instalar.mjs'

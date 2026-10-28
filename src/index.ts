@@ -17,6 +17,7 @@ import { auditValue } from "./audit-redaction.js";
 import { apfPreparationSchema, prepareApfCount, validateApfCount } from "./apf-kit.js";
 import { assertApfImportTarget, saveApfArtifacts } from "./apf-artifacts.js";
 import { guidedApfSchema, planGuidedApf, GUIDED_APF_INSTRUCTIONS } from "./apf-guided.js";
+import { dicaInputSchema, prepareDica, createDicaSimulation, getDicaSimulation, cancelDicaSimulation, consumeDicaSimulation, dicaHash, recordDicaAudit, validateDicaFiles, DICA_FLOW_INSTRUCTIONS } from "./dica-mestre.js";
 import {
   associationHash,
   consumeAssociationSimulation,
@@ -59,13 +60,13 @@ import {
   uiHash,
 } from "./universal.js";
 
-const EXTRACTOR_VERSION = "1.1.2";
+const EXTRACTOR_VERSION = "1.2.0";
 const apf = new ApfSession();
 
 const server = new McpServer(
   { name: "agilepoint-apf", version: EXTRACTOR_VERSION },
   {
-    instructions:
+    instructions: DICA_FLOW_INSTRUCTIONS +
       "Servidor AgilePoint APF com chamadas serializadas. Sem credenciais pré-configuradas, chame autenticar_agilepoint uma vez com as credenciais informadas pelo usuário; não repita nem registre a senha. Simule antes de executar. No modo delegated, a IA pode executar criações e edições após conferir a simulação; operações destrutivas ainda exigem aprovação humana. No modo external, toda escrita exige aprovação externa. No modo elicitation, o cliente MCP deve apresentar uma confirmação interativa à pessoa. Datas devem estar no formato DD/MM/AAAA. " + GUIDED_APF_INSTRUCTIONS,
   },
 );
@@ -81,6 +82,68 @@ const expectedApfTotals = z.object({
   pf_base: z.number().finite().nonnegative().optional(),
   pf_equivalente: z.number().finite().nonnegative().optional(),
 }).strict();
+
+server.registerTool("consultar_minhas_dicas_mestre", {
+  title: "Consultar minhas inscrições de Dica de Mestre",
+  description: "Consulta por endpoint a grade Minhas Inscrições vinculada à tela Dica de Mestre da conta autenticada. Retorna a avaliação publicada pelo AgilePoint sem presumir aprovação ou visibilidade no catálogo.",
+  inputSchema: {}, annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
+}, async () => apf.serialized(async () => result({ inscricoes: await apf.masterTipSubmissionsHttp(), consultado_em: new Date().toISOString(), formulario_id: "500000386" })));
+
+server.registerTool("simular_publicacao_dica_mestre", {
+  title: "Preparar e simular publicação de Dica de Mestre",
+  description: "Valida título, descrição, documentação Markdown e anexos de apoio locais, confere o contrato da tela e duplicidade nas suas inscrições e solicita a aprovação configurada. Não inicia um envio nem transfere arquivos ao servidor. Para anexos e .md use APF_UPLOAD_DIR. A submissão posterior segue a avaliação do AgilePoint.",
+  inputSchema: { publicacao: dicaInputSchema }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+}, async ({ publicacao }) => {
+  requireRole(["desenvolvedor", "gerente", "administrador"], "simular_publicacao_dica_mestre");
+  return apf.serialized(async () => {
+    const prepared = await prepareDica(publicacao);
+    const endpoint = apf.masterTipEndpoint();
+    const contract = await endpoint.inspect();
+    await endpoint.ensureUnique(prepared.titulo);
+    const preview = createDicaSimulation(prepared, contract.fingerprint);
+    const approval = await createWriteAuthorization("publicar_dica_mestre", dicaHash(preview.simulacao), preview.simulacao);
+    return result({ ...preview, aprovacao: approval, gravado_no_agilepoint: false, aviso: "Confira título, descrição, documentação integral e anexos. A execução submete uma inscrição; não concede aprovação nem altera sua avaliação." });
+  });
+});
+
+server.registerTool("cancelar_publicacao_dica_mestre", {
+  title: "Cancelar preparação local de Dica de Mestre",
+  description: "Descarta uma simulação ainda pendente. Como a simulação não envia arquivos nem cria inscrição, nada precisa ser excluído no AgilePoint. Não desfaz uma publicação já executada ou de resultado incerto.",
+  inputSchema: { confirmacao_token: z.string().uuid() }, annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+}, async ({ confirmacao_token }) => apf.serialized(async () => result(cancelDicaSimulation(confirmacao_token))));
+
+server.registerTool("publicar_dica_mestre", {
+  title: "Submeter inscrição de Dica de Mestre por endpoint",
+  description: "Executa uma simulação aprovada: inicia GUID, vincula anexos à sessão, transfere arquivos aprovados e submete título/descrição/Markdown. Confere a inscrição por ID e relê a documentação. Mantém a avaliação/aprovação do AgilePoint. Não repita automaticamente em caso de resultado incerto nem troque a chave de idempotência para contornar a proteção.",
+  inputSchema: { confirmacao_token: z.string().uuid(), chave_idempotencia: z.string().trim().min(8).max(200), aprovacao_id: z.string().uuid().optional() },
+  annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
+}, async ({ confirmacao_token, chave_idempotencia, aprovacao_id }) => {
+  requireRole(["desenvolvedor", "gerente", "administrador"], "publicar_dica_mestre");
+  return apf.serialized(async () => {
+    const simulation = getDicaSimulation(confirmacao_token), hash = dicaHash(simulation);
+    await verifyWriteAuthorization(aprovacao_id, "publicar_dica_mestre", hash, chave_idempotencia, false, true, simulation, elicitApproval);
+    if (dicaHash(getDicaSimulation(confirmacao_token)) !== hash) throw new Error("A simulação mudou durante a confirmação. Simule novamente.");
+    await validateDicaFiles(simulation.conteudo);
+    const claim = await claimIdempotency("publicar_dica_mestre", chave_idempotencia, hash);
+    if (!claim.claimed) {
+      if (claim.record.status === "success") return result({ sucesso: true, duplicado_impedido: true, ocorrido_em: claim.record.completed_at });
+      throw new Error(`A publicação está em estado ${claim.record.status}. Consulte Minhas Inscrições e não repita o envio automaticamente.`);
+    }
+    await consumeWriteAuthorization(aprovacao_id, "publicar_dica_mestre", hash, chave_idempotencia);
+    let lastProgress: unknown = { etapa: "execucao_iniciada" };
+    try {
+      const submitted = await apf.masterTipEndpoint().publish(simulation, async progress => { lastProgress = progress; await recordDicaAudit(chave_idempotencia, simulation, "progresso", progress); });
+      const audit = await finalizeSuccessfulAudit("publicar_dica_mestre", chave_idempotencia, hash, submitted, () => recordDicaAudit(chave_idempotencia, simulation, "sucesso", submitted));
+      consumeDicaSimulation(confirmacao_token);
+      return result({ sucesso: true, duplicado_impedido: false, ...submitted, ...audit });
+    } catch (error) {
+      await completeIdempotency("publicar_dica_mestre", chave_idempotencia, hash, "outcome_unknown", error instanceof Error ? error.message : "Falha no envio");
+      await recordDicaAudit(chave_idempotencia, simulation, "falha", lastProgress).catch(() => {});
+      consumeDicaSimulation(confirmacao_token);
+      return { ...result({ sucesso: false, resultado_incerto: true, ultima_etapa: lastProgress, erro: error instanceof Error ? error.message : "Falha no envio", orientacao: "Consulte Minhas Inscrições antes de qualquer nova tentativa. Se houve upload sem submissão confirmada, podem existir arquivos temporários no lote; a auditoria privada conserva o GUID para reconciliação. O MCP não executa exclusões não homologadas." }), isError: true };
+    }
+  });
+});
 
 server.registerTool("iniciar_contagem_guiada", {
   title: "Contar PF de uma tela e cadastrar no AgilePoint",

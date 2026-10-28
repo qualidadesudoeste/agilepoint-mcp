@@ -5,12 +5,20 @@
       {
         "formIds": ["*"],
         "capabilities": ["field_write", "include", "edit", "save", "delete", "cancel", "refresh"]
+      },
+      {
+        "formIds": ["500000385"],
+        "capabilities": ["publicar_dica_mestre"]
       }
     ],
     "gerente": [
       {
         "formIds": ["*"],
         "capabilities": ["field_write", "include", "edit", "save", "delete", "cancel", "refresh"]
+      },
+      {
+        "formIds": ["500000385"],
+        "capabilities": ["publicar_dica_mestre"]
       }
     ]
   }
