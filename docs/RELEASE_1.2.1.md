@@ -23,3 +23,5 @@ Erros das ferramentas recebem código, origem, operação, versão e orientaçã
 ## Verificação
 
 Testes locais cobrem migração 1.0.0, JSON/TOML, conflitos, preservação de política/dados, remoção de credenciais da conexão, reconexão e diagnósticos pelo protocolo MCP. Os testes de caminhos/npm simulam Windows/macOS/Linux. Instalação e migração do ZIP são verificadas em ambiente isolado Windows nos cinco formatos de cliente. Não se declara homologação nativa em macOS/Linux nem nova homologação de gravação no AgilePoint nesta versão.
+
+Na publicação de 05/11/2026, os testes automatizados passaram nas seis combinações de Windows/macOS/Linux com Node 22/24. Foi corrigido o reconhecimento das políticas padrão com finais de linha CRLF ou BOM, preservando as políticas personalizadas. Evidência: https://github.com/qualidadesudoeste/agilepoint-mcp/actions/runs/42034986100 . Isso não equivale a homologar a interface real de cada cliente de IA.
