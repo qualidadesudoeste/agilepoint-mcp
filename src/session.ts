@@ -53,6 +53,7 @@ import {
   buildRepositoryRankingRequestBody,
   parseGeneratedReportPath,
   buildLookupSearchUrl,
+  buildContributionUserLookupSearchUrl,
   parseLookupXml,
   parseFormRecordIdentity,
   parseWebrunHiddenValue,
@@ -401,6 +402,7 @@ export class ApfSession {
     if (response.status < 200 || response.status >= 300) throw new Error(`O lookup ${kind} respondeu HTTP ${response.status}.`);
     const body = response.text();
     if (isLoginDocument(body)) throw new Error("A sessão do lookup expirou e retornou a tela de autenticação.");
+    if (deniedDocument(body)) throw new Error(`O AgilePoint negou acesso ao lookup ${kind}. A resposta não indica registro inexistente.`);
     const all = parseLookupXml(body);
     return {
       options: all.slice(0, limit),
@@ -2173,6 +2175,25 @@ export class ApfSession {
     }
   }
 
+  async previewFunctionUsers(simulation: AssociationSimulation) {
+    const countId = await this.resolveExactCountIdHttp(simulation.contagem);
+    const initial = await this.countFunctionsById(countId);
+    if (initial.count.closed) throw new Error("A contagem está fechada e não pode receber novas associações.");
+    const available = initial.functions.map(row => ({ id: stableGridRecordId(row), nome: String(row.field743 ?? "").replace(/\s+/g, " ").trim(), associacoes_atuais: contributionSnapshot(Array.isArray(row._contributions) ? row._contributions as Array<Record<string, unknown>> : []) }));
+    const requested = simulation.funcoes?.length ? simulation.funcoes : available.map(item => item.nome);
+    if (!requested.length) throw new Error("A contagem não possui funções para associar.");
+    const selected = requested.map(name => {
+      const matches = available.filter(item => normalize(item.nome) === normalize(name));
+      if (matches.length !== 1) throw new Error(`A função "${name}" possui ${matches.length} correspondências. Informe uma função inequívoca. Nenhuma associação foi iniciada.`);
+      if (!matches[0].id || !/^\d+$/.test(matches[0].id)) throw new Error("O AgilePoint não retornou o ID estável da função.");
+      return { id: matches[0].id, nome: matches[0].nome, associacoes_atuais: matches[0].associacoes_atuais };
+    });
+    const users = await this.resolveContributionUsersHttp(simulation.usuarios, {
+      functionId: selected[0].id, countId, position: initial.functions.findIndex(row => stableGridRecordId(row) === selected[0].id) + 1,
+    });
+    return { contagem_id: countId, funcoes: selected, usuarios: users };
+  }
+
   async associateFunctionUsers(simulation: AssociationSimulation): Promise<{
     contagem_id: string;
     funcoes_alteradas: Array<{ funcao: string; associacoes_anteriores: number; usuarios_associados: number }>;
@@ -2184,7 +2205,11 @@ export class ApfSession {
       throw new Error("A gravação está desabilitada. Defina APF_WRITE_ENABLED=true somente depois de validar o fluxo em homologação.");
     }
 
-    const countId = await this.resolveExactCountIdHttp(simulation.contagem);
+    const checked = await this.previewFunctionUsers(simulation);
+    if (simulation.alvos_verificados && JSON.stringify(checked) !== JSON.stringify(simulation.alvos_verificados)) {
+      throw new Error("A contagem, as funções ou os usuários mudaram desde a simulação. Simule e aprove novamente antes de gravar.");
+    }
+    const countId = checked.contagem_id;
     const initial = await this.countFunctionsById(countId);
     if (initial.count.closed) throw new Error("A contagem está fechada e não pode receber novas associações.");
     const available = initial.functions.map((row, index) => ({
@@ -2198,7 +2223,7 @@ export class ApfSession {
     const targets = requested.map((name) => available.find((item) => normalize(item.name) === normalize(name)) ?? null);
     const missing = requested.filter((_, index) => !targets[index]);
     if (missing.length) throw new Error(`Funções não encontradas na contagem: ${missing.join(", ")}. Nenhuma associação foi iniciada.`);
-    const resolvedUsers = await this.resolveContributionUsersHttp(simulation.usuarios);
+    const resolvedUsers = checked.usuarios;
     const detail = await this.openCountDocumentById(countId);
 
     const changed: Array<{ funcao: string; associacoes_anteriores: number; usuarios_associados: number }> = [];
@@ -2406,19 +2431,59 @@ export class ApfSession {
 
   private async resolveContributionUsersHttp(
     users: AssociationSimulation["usuarios"],
+    target: { functionId: string; countId: string; position: number },
   ): Promise<Array<{ userId: string; percentage: number }>> {
     const resolved: Array<{ userId: string; percentage: number }> = [];
+    const contextualLookup = await this.contributionUserOptionsHttp(target);
     for (const user of users) {
-      const lookup = await this.lookupOptions("usuario_contribuicao", user.usuario, 200);
-      const exact = lookup.options.filter((option) => normalize(option.label) === normalize(user.usuario));
+      const id = /^id:(\d+)$/i.exec(user.usuario.trim())?.[1];
+      const lookup = contextualLookup;
+      const nameOnly = (label: string) => normalize(label.replace(/\s*\d{3}\.\d{3}\.\d{3}-\d{2}\s*$/, "").replace(/\s*\([^)]*\)\s*$/, ""));
+      const exactLabel = lookup.options.filter(option => normalize(option.label) === normalize(user.usuario));
+      const exact = id ? lookup.options.filter(option => option.id === id)
+        : exactLabel.length ? exactLabel : lookup.options.filter(option => nameOnly(option.label) === normalize(user.usuario));
+      if (!id && !lookup.complete) throw new Error("A consulta de usuários está incompleta. Refine o nome ou informe id: seguido do ID estável antes de associar.");
       if (exact.length !== 1) {
         throw new Error(exact.length
           ? `O usuário "${user.usuario}" possui ${exact.length} correspondências exatas no AgilePoint.`
-          : `O usuário "${user.usuario}" não foi encontrado exatamente no AgilePoint.`);
+          : `O usuário "${user.usuario}" não foi encontrado entre os responsáveis elegíveis da aplicação para esta função. Confira o vínculo do desenvolvedor na aplicação; o MCP não amplia o catálogo autorizado.`);
       }
       resolved.push({ userId: exact[0].id, percentage: user.percentual });
     }
+    if (new Set(resolved.map(user => user.userId)).size !== resolved.length) throw new Error("Dois responsáveis informados correspondem à mesma pessoa. Consolide seus percentuais antes de associar.");
     return resolved;
+  }
+
+  private async contributionUserOptionsHttp(target: { functionId: string; countId: string; position: number }): Promise<{ options: LookupOption[]; complete: boolean }> {
+    const detail = await this.openCountDocumentById(target.countId);
+    await this.fetchDependentGridEndpointHttp(detail.url, target.position, "contribuicoes", "1026483");
+    const selector = await this.http.get(buildFormOpenUrl(this.baseUrl, "59"), { Referer: detail.url });
+    const selectorBody = selector.text();
+    if (selector.status < 200 || selector.status >= 300 || isLoginDocument(selectorBody) || deniedDocument(selectorBody)
+      || !/new HTMLLookup\(['"]APF['"],\s*59,\s*1026478,/.test(selectorBody)) {
+      throw new Error("O AgilePoint não publicou o seletor autorizado de responsáveis da função.");
+    }
+    try {
+      const insertion = await this.http.get(buildFunctionContributionGridInsertUrl(this.baseUrl), { Referer: detail.url });
+      const insertedBody = insertion.text();
+      assertSuccessfulGridMutation(insertion.status, insertedBody, "abrir o seletor de responsáveis");
+      if (parseWebrunHiddenValue(insertedBody, "2087974631") !== target.functionId) throw new Error("O seletor de responsáveis abriu para uma função diferente. Nenhuma associação foi iniciada.");
+      const response = await this.http.get(buildContributionUserLookupSearchUrl(this.baseUrl, target.functionId), { Referer: detail.url });
+      const body = response.text();
+      if (response.status < 200 || response.status >= 300 || isLoginDocument(body) || deniedDocument(body)) {
+        throw new Error("O AgilePoint não permitiu consultar os responsáveis elegíveis desta função.");
+      }
+      const $ = load(body, { xmlMode: true });
+      if ($("error").length || $("r").length !== 1) throw new Error("O seletor de responsáveis retornou uma resposta inválida; nenhuma associação foi iniciada.");
+      const options = parseLookupXml(body);
+      if ($('next[enabled="true"]').length || options.length > 200) {
+        throw new Error("A lista de responsáveis elegíveis desta função está incompleta; nenhuma associação foi iniciada.");
+      }
+      return { options, complete: true };
+    } finally {
+      const cancel = await this.http.get(buildGridCancelUrl(this.baseUrl, "contribuicao", "insert"), { Referer: detail.url });
+      assertSuccessfulGridMutation(cancel.status, cancel.text(), "cancelar a preparação do seletor de responsáveis");
+    }
   }
 
   private async replaceFunctionContributionsHttp(

@@ -6,7 +6,6 @@ import { validateUploadFile, type UploadActionContract } from "./upload-actions.
 import { BoundedPendingStore } from "./pending-simulations.js";
 import { currentActor } from "./access.js";
 import { auditActor, auditIdempotencyKey, auditValue } from "./audit-redaction.js";
-import { readApfImportControl, type ApfImportControl } from "./apf-artifacts.js";
 
 const HEADER = "Função Transacional (EE, CE, SE) ou Função de Dados (ALI, AIE)";
 const SHEET = "Funções";
@@ -34,7 +33,6 @@ export type QuickImportPreview = {
   tabela_json: string;
   tabela_webrun: string;
   tabela_html: string;
-  kit_apf?: ApfImportControl;
 };
 
 export type QuickImportSimulation = {
@@ -46,7 +44,6 @@ export type QuickImportSimulation = {
   linhas_com_dados: number;
   grupos: number;
   itens: number;
-  kit_apf?: ApfImportControl;
 };
 
 const pending = new BoundedPendingStore<QuickImportSimulation>();
@@ -62,7 +59,6 @@ export function createQuickImportSimulation(countId: string, file: string, previ
     linhas_com_dados: preview.linhas_com_dados,
     grupos: preview.linhas.filter((row) => row.descricao && !row.tipo).length,
     itens: preview.linhas.filter((row) => row.tipo).length,
-    ...(preview.kit_apf ? { kit_apf: preview.kit_apf } : {}),
   };
   const token = randomUUID();
   const expiresAt = Date.now() + 10 * 60_000;
@@ -227,7 +223,6 @@ export async function readQuickImportWorkbook(file: string): Promise<QuickImport
   const rows = await readSheet(validated.body, SHEET);
   const preview = parseQuickImportRows(rows, validated.filename, createHash("sha256").update(validated.body).digest("hex"));
   const generatedByKit = rows[3]?.[1] === "AgilePoint MCP — Contagem de pontos de função";
-  const kit = await readApfImportControl(validated.path, preview.sha256, preview.linhas, generatedByKit);
-  if (kit) preview.kit_apf = kit;
+  if (generatedByKit) throw new Error("O kit de contagem foi removido. Use uma planilha do modelo de importação do AgilePoint, conferida pelo responsável, sem artefatos do kit antigo.");
   return preview;
 }

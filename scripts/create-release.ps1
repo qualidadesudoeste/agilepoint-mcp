@@ -29,16 +29,16 @@ try {
   $fileMap = [ordered]@{
     'README.md' = 'docs/README_TESTADORES.md'
     'LIMITACOES_CONHECIDAS.md' = 'docs/LIMITACOES_TESTADORES.md'
-    'KIT_APF.md' = 'docs/KIT_APF.md'
     'DICA_DE_MESTRE.md' = 'docs/DICA_DE_MESTRE.md'
-    'assets/apf/FPA-MODELO.xlsx' = 'assets/apf/FPA-MODELO.xlsx'
     'Instalar.ps1' = 'Instalar.ps1'
     'instalar.mjs' = 'instalar.mjs'
     'capabilities.json' = 'capabilities.developer-all-accessible.example.json'
     'scripts/approve.mjs' = 'scripts/approve.mjs'
     'scripts/smoke.mjs' = 'scripts/smoke.mjs'
+    'scripts/installer-upgrade.mjs' = 'scripts/installer-upgrade.mjs'
   }
   foreach ($file in Get-ChildItem -LiteralPath (Join-Path $projectRoot 'dist') -File -Filter '*.js') {
+    if ($file.Name -in @('apf-kit.js', 'apf-artifacts.js', 'apf-workbook.js', 'apf-guided.js')) { continue }
     $fileMap[('dist/' + $file.Name)] = 'dist/' + $file.Name
   }
   foreach ($relative in $fileMap.Values) {

@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import { createHash, randomUUID } from "node:crypto";
+import { installationRoot, inspectRegistrations, migratedConfiguration, codexRegistrationDocument, removeCodexRegistrations, removeManagedCodexBlock } from "./scripts/installer-upgrade.mjs";
 
 const packageRoot = path.dirname(fileURLToPath(import.meta.url));
 const clients = ["claude-desktop", "claude-code", "cursor", "vscode", "codex"];
@@ -12,14 +13,15 @@ const markerBegin = "# BEGIN AGILEPOINT MCP MANAGED";
 const markerEnd = "# END AGILEPOINT MCP MANAGED";
 
 export function configurationPath(client, { platform = process.platform, userHome = homedir(), env = process.env } = {}) {
-  if (client === "claude-code") return path.join(userHome, ".claude.json");
-  if (client === "cursor") return path.join(userHome, ".cursor", "mcp.json");
-  if (client === "codex") return path.join(env.CODEX_HOME || path.join(userHome, ".codex"), "config.toml");
-  if (client === "vscode") return path.join(env.COPILOT_HOME || path.join(userHome, ".copilot"), "mcp-config.json");
+  const p = platform === "win32" ? path.win32 : path.posix;
+  if (client === "claude-code") return p.join(userHome, ".claude.json");
+  if (client === "cursor") return p.join(userHome, ".cursor", "mcp.json");
+  if (client === "codex") return p.join(env.CODEX_HOME || p.join(userHome, ".codex"), "config.toml");
+  if (client === "vscode") return p.join(env.COPILOT_HOME || p.join(userHome, ".copilot"), "mcp-config.json");
   if (client === "claude-desktop") {
-    if (platform === "win32") return path.join(env.APPDATA || path.join(userHome, "AppData", "Roaming"), "Claude", "claude_desktop_config.json");
-    if (platform === "darwin") return path.join(userHome, "Library", "Application Support", "Claude", "claude_desktop_config.json");
-    return path.join(env.XDG_CONFIG_HOME || path.join(userHome, ".config"), "Claude", "claude_desktop_config.json");
+    if (platform === "win32") return p.join(env.APPDATA || p.join(userHome, "AppData", "Roaming"), "Claude", "claude_desktop_config.json");
+    if (platform === "darwin") return p.join(userHome, "Library", "Application Support", "Claude", "claude_desktop_config.json");
+    return p.join(env.XDG_CONFIG_HOME || p.join(userHome, ".config"), "Claude", "claude_desktop_config.json");
   }
   throw new Error("Cliente MCP não suportado.");
 }
@@ -33,7 +35,7 @@ export function runtimeConfiguration(destination, dataDirectory, nodePath = proc
       APF_AUTH_MODE: "chat",
       APF_CAPABILITIES_FILE: path.join(destination, "capabilities.json"),
       APF_WRITE_ENABLED: "true",
-      APF_WRITE_APPROVAL_MODE: "external",
+      APF_WRITE_APPROVAL_MODE: "automatic",
       APF_AUDIT_DIR: path.join(dataDirectory, "auditoria"),
       APF_APPROVAL_DIR: path.join(dataDirectory, "aprovacoes"),
       APF_EXPORT_DIR: path.join(dataDirectory, "exportacoes"),
@@ -46,7 +48,11 @@ function installedEntry(entry, destination) {
   return Boolean(entry && Array.isArray(entry.args) && entry.args.includes(path.join(destination, "dist", "index.js")));
 }
 
-export function mergeJsonConfiguration(document, entry, destination) {
+export async function verifiedManagedEntries(document) {
+  return (await inspectRegistrations(document)).verified.map(registration => registration.name);
+}
+
+export function mergeJsonConfiguration(document, entry, destination, managedNames = []) {
   if (!document || typeof document !== "object" || Array.isArray(document)) throw new Error("A configuração do cliente não é um objeto JSON.");
   const updated = structuredClone(document);
   if (updated.mcpServers !== undefined && (!updated.mcpServers || typeof updated.mcpServers !== "object" || Array.isArray(updated.mcpServers))) {
@@ -54,8 +60,10 @@ export function mergeJsonConfiguration(document, entry, destination) {
   }
   updated.mcpServers ??= {};
   const names = ["agilepoint", "agilepoint-apf", "agilepoint-apf-v1"];
-  const name = names.find((candidate) => !updated.mcpServers[candidate] || installedEntry(updated.mcpServers[candidate], destination));
+  const managed = Object.keys(updated.mcpServers).filter(candidate => managedNames.includes(candidate) || installedEntry(updated.mcpServers[candidate], destination));
+  const name = managed[0] ?? names.find((candidate) => !updated.mcpServers[candidate]);
   if (!name) throw new Error("Há registros conflitantes do AgilePoint no cliente; nenhum deles foi substituído.");
+  for (const duplicate of managed) if (duplicate !== name) delete updated.mcpServers[duplicate];
   updated.mcpServers[name] = entry;
   return { text: `${JSON.stringify(updated, null, 2)}\n`, name };
 }
@@ -82,7 +90,13 @@ export function mergeCodexConfiguration(text, entry) {
   if (!name) throw new Error("Há registros conflitantes do AgilePoint no Codex; nenhum deles foi substituído.");
   const quoted = (value) => JSON.stringify(value);
   const lines = [markerBegin, `[mcp_servers.${name}]`, `command = ${quoted(entry.command)}`,
-    `args = [${entry.args.map(quoted).join(", ")}]`, "startup_timeout_sec = 30", "tool_timeout_sec = 1800",
+    `args = [${entry.args.map(quoted).join(", ")}]`, ...(entry.disabled ? ["enabled = false"] : []),
+    `startup_timeout_sec = ${Number.isFinite(entry.startup_timeout_sec) ? entry.startup_timeout_sec : 30}`,
+    `tool_timeout_sec = ${Number.isFinite(entry.tool_timeout_sec) ? entry.tool_timeout_sec : 1800}`,
+    ...["enabled_tools", "disabled_tools"].filter(key => entry[key] !== undefined).map(key => {
+      if (!Array.isArray(entry[key]) || entry[key].some(value => typeof value !== "string")) throw new Error("MIGRACAO_POLITICA_INVALIDA: lista de ferramentas inválida; configuração preservada.");
+      return `${key} = ${JSON.stringify(entry[key])}`;
+    }),
     `[mcp_servers.${name}.env]`, ...Object.entries(entry.env).map(([key, value]) => `${key} = ${quoted(value)}`), markerEnd];
   return { text: `${existing.trimEnd()}${existing.trim() ? "\n\n" : ""}${lines.join("\n")}\n`, name };
 }
@@ -123,14 +137,15 @@ async function run(executable, args, cwd, capture = false) {
   });
 }
 
-async function npmCli() {
-  const directory = path.dirname(process.execPath);
-  const candidates = [path.join(directory, "node_modules", "npm", "bin", "npm-cli.js"),
-    path.join(directory, "..", "lib", "node_modules", "npm", "bin", "npm-cli.js")];
-  for (const folder of (process.env.PATH || "").split(path.delimiter)) candidates.push(path.join(folder, "npm"));
+export async function resolveNpmCli({ nodeExecutable = process.execPath, platform = process.platform, env = process.env, realpath = fs.realpath } = {}) {
+  const p = platform === "win32" ? path.win32 : path.posix;
+  const directory = p.dirname(nodeExecutable);
+  const candidates = [p.join(directory, "node_modules", "npm", "bin", "npm-cli.js"),
+    p.join(directory, "..", "lib", "node_modules", "npm", "bin", "npm-cli.js")];
+  for (const folder of (env.PATH || env.Path || "").split(p.delimiter).filter(Boolean)) candidates.push(p.join(folder, "npm"));
   for (const candidate of candidates) {
     try {
-      const resolved = await fs.realpath(candidate);
+      const resolved = await realpath(candidate);
       if (resolved.endsWith(".js")) return resolved;
     } catch {}
   }
@@ -149,7 +164,7 @@ async function detectClient() {
 }
 
 async function copyRuntime(source, destination) {
-  const fileNames = ["package.json", "package-lock.json", "capabilities.json", "README.md", "LIMITACOES_CONHECIDAS.md", "KIT_APF.md", "DICA_DE_MESTRE.md", "assets/apf/FPA-MODELO.xlsx", "instalar.mjs", "Instalar.ps1", "scripts/approve.mjs", "scripts/smoke.mjs"];
+  const fileNames = ["package.json", "package-lock.json", "capabilities.json", "README.md", "LIMITACOES_CONHECIDAS.md", "DICA_DE_MESTRE.md", "instalar.mjs", "Instalar.ps1", "scripts/approve.mjs", "scripts/smoke.mjs", "scripts/installer-upgrade.mjs"];
   for (const entry of await fs.readdir(path.join(source, "dist"), { withFileTypes: true })) {
     if (entry.isFile() && entry.name.endsWith(".js")) fileNames.push(`dist/${entry.name}`);
   }
@@ -167,9 +182,7 @@ export async function install(options = {}) {
   const source = path.resolve(options.source || packageRoot);
   const manifest = JSON.parse(await fs.readFile(path.join(source, "package.json"), "utf8"));
   if (manifest.name !== "agilepoint-apf-mcp" || !/^\d+\.\d+\.\d+$/.test(manifest.version)) throw new Error("Pacote AgilePoint inválido.");
-  const userRoot = process.platform === "win32" ? path.join(process.env.LOCALAPPDATA || path.join(homedir(), "AppData", "Local"), "AgilePointMCP")
-    : process.platform === "darwin" ? path.join(homedir(), "Library", "Application Support", "AgilePointMCP")
-    : path.join(process.env.XDG_DATA_HOME || path.join(homedir(), ".local", "share"), "agilepoint-mcp");
+  const userRoot = installationRoot({ userHome: homedir() });
   const client = options.client === "detectar" || !options.client ? await detectClient() : options.client;
   if (!clients.includes(client)) throw new Error("Cliente não suportado.");
   const destination = path.resolve(options.destination || path.join(userRoot, "app", manifest.version));
@@ -199,12 +212,14 @@ export async function install(options = {}) {
   }
   for (const name of ["auditoria", "aprovacoes", "exportacoes", "importacao"]) await fs.mkdir(path.join(dataDirectory, name), { recursive: true, mode: 0o700 });
   if (!installed || !await readOptional(path.join(destination, "node_modules", "@modelcontextprotocol", "sdk", "package.json"))) {
-    await run(process.execPath, [await npmCli(), "ci", "--omit=dev", "--ignore-scripts"], destination);
+    await run(process.execPath, [await resolveNpmCli(), "ci", "--omit=dev", "--ignore-scripts"], destination);
   }
   const tools = await run(process.execPath, ["scripts/smoke.mjs"], destination, true);
   if (!tools.split(/\r?\n/).includes("autenticar_agilepoint")) throw new Error("O diagnóstico não confirmou a ferramenta de login.");
   await fs.writeFile(markerFile, `${JSON.stringify({ version: manifest.version, digest, status: "ready" }, null, 2)}\n`, { mode: 0o600 });
-  const entry = runtimeConfiguration(destination, dataDirectory);
+  let entry = runtimeConfiguration(destination, dataDirectory);
+  entry.env.APF_INSTALL_STATE_FILE = path.join(dataDirectory, "instalacao.json");
+  let migration = { verified: [], suspicious: [] };
   const configFile = path.resolve(options.configFile || configurationPath(client));
   let serverName = "agilepoint";
   const generatedFile = path.join(destination, "configuracao-gerada.json");
@@ -212,25 +227,49 @@ export async function install(options = {}) {
   if (!options.prepareOnly) {
     const prior = await readOptional(configFile);
     let merged;
-    if (client === "codex") merged = mergeCodexConfiguration(prior || "", entry);
-    else {
-      const require = createRequire(path.join(destination, "package.json"));
-      const JSON5 = require("json5");
-      let document;
-      try { document = prior ? JSON5.parse(prior) : {}; } catch { throw new Error("A configuração existente não pôde ser lida; foi preservada."); }
-      merged = mergeJsonConfiguration(document, entry, destination);
+    const require = createRequire(path.join(destination, "package.json"));
+    const JSON5 = require("json5");
+    let document;
+    try { document = client === "codex" ? codexRegistrationDocument(prior || "") : prior ? JSON5.parse(prior) : {}; }
+    catch { throw new Error("MIGRACAO_CONFIG_INVALIDA: a configuração existente não pôde ser lida; foi preservada."); }
+    migration = await inspectRegistrations(document);
+    if (migration.suspicious.length) throw new Error("MIGRACAO_NAO_VERIFICADA: há uma conexão AgilePoint antiga cuja instalação está ausente, alterada ou usa um comando não reconhecido. Nenhuma conexão foi substituída ou duplicada. Restaure a pasta original ou identifique a conexão antiga no cliente para revisá-la antes de atualizar.");
+    if (migration.verified.some(item => item.entry.__unsupported || item.entry.env?.__unsupported)) throw new Error("MIGRACAO_TOML_COMPLEXO: o registro antigo usa sintaxe não suportada para atualização automática; arquivo preservado, sem conexão duplicada.");
+    entry = migratedConfiguration(entry, migration.verified);
+    for (const key of ["APF_AUDIT_DIR", "APF_APPROVAL_DIR", "APF_EXPORT_DIR", "APF_UPLOAD_DIR"]) {
+      if (!path.isAbsolute(entry.env[key])) throw new Error("MIGRACAO_DIRETORIO_INVALIDO: um diretório antigo não é absoluto; configuração preservada.");
+      await fs.mkdir(entry.env[key], { recursive: true, mode: 0o700 });
     }
+    const managed = migration.verified.map(item => item.name);
+    if (client === "codex") {
+      const base = removeManagedCodexBlock(prior || "");
+      merged = mergeCodexConfiguration(removeCodexRegistrations(base, codexRegistrationDocument(base).ranges, managed), entry);
+    } else merged = mergeJsonConfiguration(document, entry, destination, managed);
     await atomicWrite(configFile, merged.text, prior);
     serverName = merged.name;
   }
   await fs.writeFile(generatedFile, `${JSON.stringify({ mcpServers: { [serverName]: entry } }, null, 2)}\n`, { mode: 0o600 });
+  if (!options.prepareOnly) {
+    const stateFile = entry.env.APF_INSTALL_STATE_FILE;
+    const expected = await readOptional(stateFile);
+    await atomicWrite(stateFile, JSON.stringify({ version: manifest.version, client, server: serverName, updated_at: new Date().toISOString() }) + "\n", expected);
+  }
   return {
     instalado: true, registrado_no_cliente: !options.prepareOnly, versao: manifest.version, cliente: client,
     servidor: serverName, pasta: destination, dados: dataDirectory, configuracao: options.prepareOnly ? generatedFile : configFile,
     node_executavel: process.execPath, pasta_aprovacoes: entry.env.APF_APPROVAL_DIR,
     credenciais_configuradas: false, diagnostico: "ok",
+    atualizacao: {
+      conexoes_substituidas: migration.verified.map(item => ({ nome: item.name, versao_anterior: item.version, sem_marcador: item.legacy })),
+      credenciais_legadas_removidas_da_conexao: migration.verified.some(item => item.entry.env?.APF_PASSWORD !== undefined || item.entry.env?.APF_USERNAME !== undefined),
+      pastas_personalizadas_preservadas: true,
+      backups_antigos_alterados: false,
+      conexao_desabilitada_preservada: Boolean(entry.disabled),
+      reconexao_necessaria: true,
+      verificacao_apos_reconectar: `Chame diagnosticar_configuracao e confirme versao_em_execucao=${manifest.version} antes de autenticar ou gravar. Não altere APF_MCP_ROLE nem APF_COLLABORATOR_ID para resolver um bloqueio; use autenticar_agilepoint.`,
+    },
     proximo_passo: options.prepareOnly ? "Registre a configuração gerada no cliente antes de pedir credenciais."
-      : "Reconecte o MCP no cliente. Quando autenticar_agilepoint estiver disponível, solicite ao usuário o login e a senha do AgilePoint e autentique nesta conversa. Se o cliente exigir reinício, informe essa única etapa e continue depois da reconexão.",
+      : "Reconecte o MCP no cliente. Quando as ferramentas estiverem disponíveis, solicite somente Usuário e Senha ainda ausentes e autentique com autenticar_agilepoint. Depois pergunte: O que você deseja fazer no AgilePoint? Se a tarefa já foi informada, siga-a sem perguntar novamente. Peça os demais dados somente conforme a operação; Projeto e Sprint não são requisitos da instalação. Para contagem, mantenha a opção de importar uma planilha preenchida. Se uma contagem precisar de projeto/sprint, consulte configurar_contexto_trabalho; só ofereça criar registros não localizados após consulta válida e aguarde autorização. Se o cliente exigir reinício, retome o fluxo após reconectar.",
   };
 }
 
@@ -247,5 +286,10 @@ function parseArguments(args) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
   try { console.log(JSON.stringify(await install(parseArguments(process.argv.slice(2))), null, 2)); }
-  catch (error) { console.error(JSON.stringify({ instalado: false, erro: error.message })); process.exitCode = 1; }
+  catch (error) {
+    const code = /^(MIGRACAO_[A-Z_]+)/.exec(error.message)?.[1] ?? "INSTALACAO_FALHOU";
+    console.error(JSON.stringify({ instalado: false, etapa: "instalacao", codigo: code, origem: code.startsWith("MIGRACAO_") ? "mcp_local" : "indeterminada", erro: error.message,
+      orientacao: "Confira a mensagem e a instalação atual. Não altere perfil/identificador para contornar um bloqueio nem registre uma segunda conexão antiga. Uma instalação parcial pode ser retomada executando novamente o instalador. Após concluir, reconecte e confira diagnosticar_configuracao." }));
+    process.exitCode = 1;
+  }
 }

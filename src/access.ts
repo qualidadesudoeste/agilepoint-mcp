@@ -3,6 +3,16 @@ export type McpRole = "leitura" | "desenvolvedor" | "gerente" | "administrador";
 const validRoles = new Set<McpRole>(["leitura", "desenvolvedor", "gerente", "administrador"]);
 let chatActor: { role: McpRole; colaborador_id: string; nome: string } | null = null;
 
+export function authenticationStatus() {
+  const legacy = !chatActor && environmentCredentialsAvailable();
+  const configured = (process.env.APF_MCP_ROLE ?? "leitura").trim().toLocaleLowerCase("pt-BR") as McpRole;
+  return { modo: legacy ? "ambiente_legado" : "chat", autenticado_pelo_chat: Boolean(chatActor),
+    origem_perfil: chatActor ? "menu_autenticado" : legacy ? "variavel_legada" : "sem_identidade_chat",
+    perfil_local: chatActor?.role ?? (legacy ? validRoles.has(configured) ? configured : "invalido" : null),
+    configuracao_legada_detectada: Boolean(process.env.APF_USERNAME || process.env.APF_PASSWORD || process.env.APF_MCP_ROLE || process.env.APF_COLLABORATOR_ID),
+    credenciais_do_ambiente_ignoradas: process.env.APF_AUTH_MODE === "chat" && Boolean(process.env.APF_USERNAME || process.env.APF_PASSWORD) };
+}
+
 export function environmentCredentialsAvailable(): boolean {
   return process.env.APF_AUTH_MODE !== "chat" && Boolean(process.env.APF_USERNAME && process.env.APF_PASSWORD);
 }

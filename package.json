@@ -1,6 +1,6 @@
 {
   "name": "agilepoint-apf-mcp",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "type": "module",
   "description": "MCP universal para usuários operarem telas autorizadas do AgilePoint via IA",
@@ -8,7 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "check": "tsc -p tsconfig.json --noEmit",
-    "test": "npm run build && node scripts/test.mjs && node scripts/test-elicitation.mjs && node scripts/test-installer.mjs && node scripts/test-apf-kit.mjs && node scripts/test-apf-workbook.mjs && node scripts/test-apf-integration.mjs && node scripts/test-dica-mestre.mjs",
+    "test": "npm run build && node scripts/test.mjs && node scripts/test-elicitation.mjs && node scripts/test-installer.mjs && node scripts/test-dica-mestre.mjs && node scripts/test-association-regressions.mjs && node scripts/test-initial-setup.mjs && node scripts/test-upgrade-platforms.mjs && node scripts/test-diagnostics.mjs",
     "test:discovery": "npm run build && node scripts/test-network-discovery.mjs",
     "package:release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/create-release.ps1",
     "approve": "node scripts/approve.mjs",
@@ -19,7 +19,6 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",
     "cheerio": "1.2.0",
-    "fflate": "0.8.3",
     "json5": "2.2.3",
     "read-excel-file": "9.3.10",
     "zod": "4.6.7"

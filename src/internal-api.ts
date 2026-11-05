@@ -262,6 +262,15 @@ export function buildLookupSearchUrl(baseUrl: string, kind: LookupKind, query = 
   });
 }
 
+export function buildContributionUserLookupSearchUrl(baseUrl: string, functionId: string | number): string {
+  const url = new URL(buildLookupSearchUrl(baseUrl, "usuario_contribuicao", ""));
+  // HTMLLookup.lookupDoSearch envia as dependências do componente. Sem FUN_COD,
+  // o servidor devolve uma lista vazia em vez dos desenvolvedores da aplicação.
+  url.searchParams.set("WFRInput2087974631", numericId(functionId, "função"));
+  url.searchParams.set("type", "2");
+  return url.toString();
+}
+
 export function buildCountOpenUrl(baseUrl: string, countId: string | number): string {
   const normalized = numericId(countId, "contagem");
   return buildInternalUrl(baseUrl, "/openform.do", {

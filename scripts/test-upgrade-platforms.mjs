@@ -1,0 +1,110 @@
+import assert from "node:assert/strict";
+import path from "node:path";
+import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { configurationPath, runtimeConfiguration, resolveNpmCli, mergeJsonConfiguration, mergeCodexConfiguration } from "../instalar.mjs";
+import { installationRoot, inspectRegistrations, migratedConfiguration, codexRegistrationDocument, removeCodexRegistrations, removeManagedCodexBlock } from "./installer-upgrade.mjs";
+
+for (const [platform, home] of [["win32", "C:\\Users\\Teste"], ["darwin", "/Users/teste"], ["linux", "/home/teste"]]) {
+  const p = platform === "win32" ? path.win32 : path.posix;
+  const root = installationRoot({ platform, userHome: home, env: {} });
+  assert.equal(root, platform === "win32" ? p.join(home, "AppData", "Local", "AgilePointMCP") : platform === "darwin" ? p.join(home, "Library", "Application Support", "AgilePointMCP") : p.join(home, ".local", "share", "agilepoint-mcp"));
+  for (const client of ["claude-code", "cursor", "codex", "vscode", "claude-desktop"]) {
+    const config = configurationPath(client, { platform, userHome: home, env: {} });
+    assert.equal(p.isAbsolute(config), true);
+    if (platform !== "win32") assert.equal(config.includes("\\"), false);
+  }
+  const executable = p.join(home, "runtime", "bin", "node" + (platform === "win32" ? ".exe" : ""));
+  const npmTarget = platform === "win32" ? p.join(p.dirname(executable), "node_modules", "npm", "bin", "npm-cli.js") : p.join(p.dirname(executable), "..", "lib", "node_modules", "npm", "bin", "npm-cli.js");
+  const found = await resolveNpmCli({ platform, nodeExecutable: executable, env: {}, realpath: async candidate => { if (candidate !== npmTarget) throw new Error("ausente"); return candidate; } });
+  assert.equal(found, npmTarget);
+}
+assert.equal(installationRoot({ platform: "linux", userHome: "/home/teste", env: { XDG_DATA_HOME: "/dados" } }), "/dados/agilepoint-mcp");
+assert.equal(await resolveNpmCli({ platform: "linux", nodeExecutable: "/usr/bin/node", env: { PATH: "/usr/local/bin:/usr/bin" }, realpath: async candidate => { if (candidate !== "/usr/bin/npm") throw new Error("ausente"); return "/usr/share/nodejs/npm/bin/npm-cli.js"; } }), "/usr/share/nodejs/npm/bin/npm-cli.js");
+
+const root = await mkdtemp(path.join(tmpdir(), "apf-platform-upgrade-"));
+try {
+  const old = path.join(root, "AgilePointMCP", "app", "1.0.0");
+  await mkdir(path.join(old, "dist"), { recursive: true });
+  await writeFile(path.join(old, "package.json"), JSON.stringify({ name: "agilepoint-apf-mcp", version: "1.0.0" }));
+  await writeFile(path.join(old, "dist", "index.js"), "new McpServer({ name: 'agilepoint-apf', version: '1.0.0' });");
+  const customData = path.join(root, "dados-personalizados");
+  const customPolicy = path.join(root, "politica-personalizada.json");
+  const legacy = runtimeConfiguration(old, customData);
+  Object.assign(legacy.env, { APF_USERNAME: "synthetic-user", APF_PASSWORD: "synthetic-secret", APF_MCP_ROLE: "leitura", APF_COLLABORATOR_ID: "123", APF_WRITE_APPROVAL_MODE: "external", APF_CAPABILITIES_FILE: customPolicy, APF_WRITE_ENABLED: "false" });
+  const document = { preserve: 1, mcpServers: { agilepoint: legacy, "agilepoint-apf": structuredClone(legacy), other: { command: "keep" } } };
+  const inspected = await inspectRegistrations(document);
+  assert.equal(inspected.verified.length, 2, "reconhecer pacote 1.0.0 sem marcador sem executar código antigo");
+  assert.deepEqual(inspected.suspicious, []);
+  const destination = path.join(root, "AgilePointMCP", "app", "1.2.1");
+  const entry = migratedConfiguration(runtimeConfiguration(destination, path.join(root, "dados-novos")), inspected.verified);
+  assert.equal(entry.env.APF_CAPABILITIES_FILE, customPolicy);
+  assert.equal(entry.env.APF_AUDIT_DIR, legacy.env.APF_AUDIT_DIR);
+  assert.equal(entry.env.APF_WRITE_ENABLED, "false", "preservar desabilitação explícita de escrita");
+  assert.equal(entry.env.APF_WRITE_APPROVAL_MODE, "automatic");
+  for (const key of ["APF_USERNAME", "APF_PASSWORD", "APF_MCP_ROLE", "APF_COLLABORATOR_ID"]) assert.equal(key in entry.env, false);
+  const merged = JSON.parse(mergeJsonConfiguration(document, entry, destination, inspected.verified.map(item => item.name)).text);
+  assert.deepEqual(Object.keys(merged.mcpServers).sort(), ["agilepoint", "other"]);
+  assert.equal(merged.preserve, 1);
+  assert.deepEqual(merged.mcpServers.other, { command: "keep" });
+  const conflicting = structuredClone(inspected.verified);
+  conflicting[1].entry.env.APF_UPLOAD_DIR = path.join(root, "outros-dados");
+  assert.throws(() => migratedConfiguration(entry, conflicting), /MIGRACAO_CONFLITANTE/);
+  const invalidOrigin = structuredClone(inspected.verified.slice(0, 1));
+  invalidOrigin[0].entry.env.APF_BASE_URL = "https://synthetic-user:synthetic-secret@example.test";
+  assert.throws(() => migratedConfiguration(entry, invalidOrigin), /MIGRACAO_URL_INVALIDA/);
+  const relativeData = structuredClone(inspected.verified.slice(0, 1));
+  relativeData[0].entry.env.APF_UPLOAD_DIR = "relative-data";
+  assert.throws(() => migratedConfiguration(entry, relativeData), /MIGRACAO_DIRETORIO_INVALIDO/);
+  const bad = await inspectRegistrations({ mcpServers: { agilepoint: { command: "node", args: [path.join(root, "AgilePointMCP", "ausente", "dist", "index.js")], env: { APF_MCP_ROLE: "leitura" } } } });
+  assert.deepEqual(bad.suspicious, ["agilepoint"]);
+  await writeFile(path.join(old, "dist", "index.js"), "unrelated");
+  assert.deepEqual((await inspectRegistrations(document)).suspicious.sort(), ["agilepoint", "agilepoint-apf"]);
+  await writeFile(path.join(old, "dist", "index.js"), "new McpServer({ name: 'agilepoint-apf', version: '1.0.0' });");
+
+  const unrelated = '# preserve\nmodel = "keep"\n[other]\ninstructions = """\n[mcp_servers.fake]\nnot a header\n"""\n';
+  const oldToml = unrelated + '[ "mcp_servers" . "agilepoint" ]\ncommand = "node"\nargs = ' + JSON.stringify(legacy.args) + '\n[mcp_servers.agilepoint.env]\nAPF_PASSWORD = "synthetic-secret"\nAPF_MCP_ROLE = "leitura"\n';
+  const tomlDocument = codexRegistrationDocument(oldToml);
+  assert.equal(tomlDocument.mcpServers.fake, undefined, "não interpretar cabeçalho dentro de texto multilinha");
+  const tomlInspection = await inspectRegistrations(tomlDocument);
+  assert.equal(tomlInspection.verified.length, 1);
+  const cleaned = removeCodexRegistrations(oldToml, tomlDocument.ranges, ["agilepoint"]);
+  assert.equal(cleaned, unrelated);
+  const upgradedToml = mergeCodexConfiguration(cleaned, entry).text;
+  assert.ok(upgradedToml.startsWith(unrelated));
+  assert.equal(upgradedToml.includes("synthetic-secret"), false);
+  assert.equal((upgradedToml.match(/\[mcp_servers.agilepoint\]/g) ?? []).length, 1);
+  const unmanagedAgain = removeManagedCodexBlock(upgradedToml);
+  assert.equal(unmanagedAgain.trim(), unrelated.trim());
+  assert.equal(mergeCodexConfiguration(unmanagedAgain, entry).text, upgradedToml);
+  const restrictedClient = structuredClone(inspected.verified.slice(0, 1));
+  restrictedClient[0].entry.enabled_tools = ["listar_contagens"];
+  restrictedClient[0].entry.tool_timeout_sec = 60;
+  const restrictedClientEntry = migratedConfiguration(entry, restrictedClient);
+  assert.ok(mergeCodexConfiguration("", restrictedClientEntry).text.includes('enabled_tools = ["listar_contagens"]'));
+  assert.ok(mergeCodexConfiguration("", restrictedClientEntry).text.includes("tool_timeout_sec = 60"));
+  const protoData = codexRegistrationDocument('[mcp_servers.__proto__]\ncommand = "keep"\n');
+  assert.equal(Object.hasOwn(protoData.mcpServers, "__proto__"), true);
+  assert.equal(Object.prototype.command, undefined);
+  assert.deepEqual(codexRegistrationDocument("[mcp_servers.agilepoint]\nargs = [\n  '/Users/teste/dir com espaço/#pasta/dist/index.js', # preserve literal\n]\n").mcpServers.agilepoint.args, ["/Users/teste/dir com espaço/#pasta/dist/index.js"]);
+  assert.equal(codexRegistrationDocument("[mcp_servers.agilepoint]\nenv = { APF_AUTH_MODE = 'chat' }\n").mcpServers.agilepoint.__unsupported, true);
+  assert.equal((await readFile(path.join(old, "package.json"), "utf8")).includes("1.0.0"), true, "não modificar instalação antiga durante inspeção");
+  const restrictedPolicy = path.join(old, "capabilities.json");
+  await writeFile(restrictedPolicy, JSON.stringify({ version: 1, roles: { desenvolvedor: [] } }));
+  const restrictedEntry = structuredClone(legacy);
+  restrictedEntry.env.APF_CAPABILITIES_FILE = restrictedPolicy;
+  const restrictedRegistration = (await inspectRegistrations({ mcpServers: { agilepoint: restrictedEntry } })).verified;
+  assert.equal(migratedConfiguration(entry, restrictedRegistration).env.APF_CAPABILITIES_FILE, restrictedPolicy, "preservar política modificada mesmo no caminho padrão antigo");
+  await writeFile(restrictedPolicy, await readFile("capabilities.developer-all-accessible.example.json"));
+  const stockRegistration = (await inspectRegistrations({ mcpServers: { agilepoint: restrictedEntry } })).verified;
+  const newEntry = runtimeConfiguration(destination, path.join(root, "dados-novos"));
+  assert.equal(migratedConfiguration(newEntry, stockRegistration).env.APF_CAPABILITIES_FILE, path.join(destination, "capabilities.json"));
+  stockRegistration[0].entry.enabled = false;
+  const disabledEntry = migratedConfiguration(newEntry, stockRegistration);
+  assert.equal(disabledEntry.disabled, true);
+  assert.ok(mergeCodexConfiguration("", disabledEntry).text.includes("enabled = false"));
+} finally {
+  if (path.dirname(root) !== path.resolve(tmpdir()) || !path.basename(root).startsWith("apf-platform-upgrade-")) throw new Error("Destino de limpeza inválido");
+  await rm(root, { recursive: true, force: true });
+}
+console.log("Migração 1.0.0: JSON/TOML, identificação, credenciais, conflitos, dados/políticas preservados e reconexão. Caminhos/npm simulados para Windows/macOS/Linux: ok.");

@@ -1,5 +1,6 @@
 import { buildInternalUrl, buildLoginRequestBody } from "./internal-api.js";
 import { randomUUID } from "node:crypto";
+import { DiagnosticError } from "./diagnostics.js";
 
 export type WebrunHttpResponse = {
   status: number;
@@ -122,7 +123,7 @@ export class WebrunHttpSession {
     });
     const loginText = login.text();
     if (/Acesso negado|WFRUserNotLogged|Usu.rio ou senha n.o conferem/i.test(loginText)) {
-      throw new Error("O AgilePoint recusou as credenciais informadas.");
+      throw new DiagnosticError("CREDENCIAIS_RECUSADAS", "agilepoint", "O AgilePoint recusou as credenciais informadas.", "Confira as credenciais da conta e tente autenticar novamente. Não altere o perfil local.");
     }
 
     const validation = await this.request(buildInternalUrl(this.baseUrl, "/open.do", { sys: "APF" }), { method: "GET" });
@@ -154,8 +155,8 @@ export class WebrunHttpSession {
         response = await fetch(currentUrl, { method, headers, body: body as BodyInit | undefined, redirect: "manual", signal: controller.signal });
       } catch (error) {
         clearTimeout(timeout);
-        if (controller.signal.aborted) throw new Error(`A requisição ao AgilePoint excedeu o limite total de ${timeoutMs} ms.`);
-        throw error;
+        if (controller.signal.aborted) throw new DiagnosticError("TEMPO_DE_CONEXAO", "transporte", `A requisição ao AgilePoint excedeu o limite total de ${timeoutMs} ms.`, "Confira a conectividade. Se era gravação, consulte o registro antes de tentar novamente.");
+        throw new DiagnosticError("FALHA_DE_CONEXAO", "transporte", "Não foi possível completar a conexão HTTPS com o AgilePoint.", "Confira conexão, DNS e certificado. Isso não comprova falta de permissão; em gravações, verifique o resultado antes de repetir.");
       }
       if (![301, 302, 303, 307, 308].includes(response.status)) {
         this.captureCookies(response.headers);
@@ -164,6 +165,7 @@ export class WebrunHttpSession {
           bytes = await readResponseBytes(response, maxResponseBytes);
         } catch (error) {
           if (controller.signal.aborted) throw new Error(`A requisição ao AgilePoint excedeu o limite total de ${timeoutMs} ms.`);
+          if (error instanceof TypeError) throw new DiagnosticError("RESPOSTA_INTERROMPIDA", "transporte", "A conexão com o AgilePoint foi interrompida antes de completar a resposta.", "O resultado de uma gravação pode ser incerto. Consulte o registro antes de tentar novamente.");
           throw error;
         } finally {
           clearTimeout(timeout);

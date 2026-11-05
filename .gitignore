@@ -20,3 +20,7 @@ configuracao-gerada.json
 .agilepoint-install.json
 capabilities.json
 *.log
+
+# Roteiro local de homologação e notas de compilações internas renumeradas.
+/scripts/live-validation-client.mjs
+/docs/RELEASE_1.3.*.md

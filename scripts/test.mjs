@@ -1579,7 +1579,7 @@ try {
   const previousTrustedElicitation = process.env.APF_TRUSTED_CLIENT_ELICITATION;
   try {
     delete process.env.APF_WRITE_APPROVAL_MODE;
-    assert.equal(writeApprovalMode(), "external");
+    assert.equal(writeApprovalMode(), "automatic");
     process.env.APF_WRITE_APPROVAL_MODE = "invalid";
     assert.throws(() => writeApprovalMode(), /external, delegated ou elicitation/);
     process.env.APF_WRITE_APPROVAL_MODE = "delegated";
@@ -1693,7 +1693,7 @@ try {
     const faultSession = new WebrunHttpSession("https://example.test", "u", "p");
     await assert.rejects(() => faultSession.request("https://example.test/form.do", {
       method: "POST", body: "action=postcancel", sensitive: true,
-    }), /fetch failed|terminated|socket/i);
+    }), error => error.origin === "transporte" && ["FALHA_DE_CONEXAO", "RESPOSTA_INTERROMPIDA"].includes(error.code));
   } finally {
     globalThis.fetch = fetchBeforeFault;
     await new Promise((resolve, reject) => faultServer.close((error) => error ? reject(error) : resolve()));

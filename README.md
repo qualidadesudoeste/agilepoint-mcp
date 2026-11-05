@@ -2,25 +2,24 @@
 
 ## Baixar e instalar
 
-O pacote de instalação está na [release 1.2.0 para testes controlados](https://github.com/qualidadesudoeste/agilepoint-mcp/releases/tag/v1.2.0). Baixe o arquivo `agilepoint-mcp-1.2.0.zip`, envie à sua IA compatível com MCP local e peça **“Instale esse MCP”**. O guia de uso e as limitações acompanham o pacote. Depois de conectar o servidor, a IA solicita as credenciais individuais do AgilePoint.
+Baixe o pacote **agilepoint-mcp-1.2.1.zip** na [release 1.2.1 para testes controlados](https://github.com/qualidadesudoeste/agilepoint-mcp/releases/tag/v1.2.1). Envie o ZIP à sua IA compatível com MCP local e peça **“Instale esse MCP”** ou **“Atualize esse MCP”**. Após conectar, a IA solicita somente as credenciais individuais e pergunta o que você deseja fazer. O guia de uso e as limitações acompanham o pacote.
 
 O botão **Code → Download ZIP** baixa o código-fonte, que exige instalação das dependências e compilação. Para instalação pelo usuário, use o ZIP anexado à release. Não envie credenciais para este repositório nem para issues.
 
 Para desenvolvimento, com Node.js 22 ou superior: `npm ci`, `npm test` e `npm run test:discovery`. Os testes padrão usam dados locais/sintéticos; os scripts de homologação real são separados e exigem configuração explícita. `npm run package:release` gera a distribuição de execução sem fontes, testes ou notas internas.
 
-Versão **1.2.0**. Permite que cada usuário opere, pela própria IA compatível com MCP, as telas que sua conta consegue acessar no AgilePoint/Webrun. O catálogo XML é filtrado pelo mapa de permissões atual da conta antes de liberar as ferramentas universais. A simulação valida seletores publicados depois de abrir Incluir/Alterar, sem gravar, e verifica a capacidade local antes desse POST transitório. Esta versão integra o kit de preparação de contagens APF e um fluxo especializado de envio de Dica de Mestre.
+Versão **1.2.1**. Permite que cada usuário opere, pela própria IA compatível com MCP, as telas que sua conta consegue acessar no AgilePoint/Webrun. O catálogo XML é filtrado pelo mapa de permissões atual da conta antes de liberar as ferramentas universais. A simulação valida seletores publicados depois de abrir Incluir/Alterar, sem gravar, e verifica a capacidade local antes desse POST transitório. Esta versão mantém a importação de planilhas e o envio especializado de Dica de Mestre, sem o kit de cálculo de PF.
 
 ## Dica de Mestre
 
 Use `simular_publicacao_dica_mestre` e `publicar_dica_mestre` para enviar título, descrição, Markdown obrigatório e anexos opcionais. `cancelar_publicacao_dica_mestre` descarta uma preparação ainda local; `consultar_minhas_dicas_mestre` consulta as inscrições da conta. A capacidade local `publicar_dica_mestre` é restrita ao formulário `500000385` no modelo de instalação, sem liberar ações personalizadas genéricas. A execução preserva a aprovação configurada e o processo de avaliação do AgilePoint, confere arquivos, consulta o ID da inscrição e relê a documentação. Veja [o guia e os limites de verificação](docs/DICA_DE_MESTRE.md). Os contratos foram capturados no cliente oficial; testes automatizados virtualizam o backend, sem substituir homologação de gravação real com cada perfil.
 
-## Kit de contagem APF
+## Importar e associar funções
 
-O fluxo guiado coleta também os desenvolvedores e percentuais antes de qualquer cadastro, sem presumir responsáveis ou uma divisão. Após importar, conduz a associação nas funções explícitas do pedido e verifica as contribuições. A substituição de vínculos requer aprovação específica, inclusive em modo delegado; falhas após importar devem ser relatadas como resultado parcial sem reimportação.
+O kit de cálculo de PF e a geração de planilhas foram removidos nesta versão. A importação rápida de uma planilha preenchida no modelo do AgilePoint continua disponível: a IA usa `simular_importacao_rapida` e `importar_contagem_rapida` para enviar C:K da aba Funções.
 
-O comando simples “Faça a contagem de PF da tela X e cadastre no Agile” é atendido pelo fluxo orientado `iniciar_contagem_guiada`. As instruções do servidor e o prompt opcional `contar_tela_e_cadastrar` orientam a IA do cliente a perguntar o que faltar, analisar fontes, usar o kit e cadastrar grupos/itens na aba Funções. A análise depende da IA e das fontes acessíveis, e o cadastro mantém os controles de permissão, simulação e aprovação configurados. Consulte [o guia](docs/KIT_APF.md).
+Para distribuir os pontos, informe aplicação, versão/sprint, funções, responsáveis e percentuais que somem 100%. Exemplo: “Na aplicação X, sprint Y, associe a pessoa Z com 100% à função Consultar cliente”. A IA consulta os alvos e prepara `simular_associacao_usuarios_funcoes`. Use o nome completo do cadastro ou `id:123` para identificar a pessoa pelo ID. Homônimos devem ser esclarecidos antes da gravação. A operação substitui os vínculos das funções selecionadas e segue a política de execução automática configurada; a grade é relida para conferir o resultado.
 
-`preparar_contagem_apf`, `validar_contagem_apf` e `gerar_planilha_apf` recebem dados estruturados, sem executar scripts Python nem código produzido pela IA. A metodologia precisa ser informada e cada fator de atividade exige uma fonte; nenhum roteiro contratual é escolhido automaticamente. O PF base é separado do PF equivalente, que fica pendente quando falta um fator. Os artefatos preservam as evidências e mantêm as colunas C:K para o fluxo existente de simulação/aprovação/importação. Essas ferramentas locais não criam contagens nem gravam funções no AgilePoint. Veja [o guia do kit](docs/KIT_APF.md).
 
 Correções da 2.30.19: a abertura universal por `registro_id` usa os filtros de chave primária já homologados para Aplicação (47) e Contagem (26), em vez de tratar o ID como posição de navegação. `descrever_tela` só marca uma ação universal como disponível quando a capacidade local permite seu uso e a própria tela não a desabilitou. A listagem de contagens normaliza entidades HTML duplamente escapadas, como `&amp;nbsp;`. `verificar_conexao` informa, sem mostrar o ID, se a identidade de lançamento está configurada. Essas correções têm testes locais; o reteste com a conta desenvolvedora no AgilePoint permanece necessário.
 
@@ -118,7 +117,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/homologar-perfil-int
 
 Rode de novo com `-Perfil gerente` e a conta individual correspondente. Para exportação, acrescente `-Exportar pdf -DiretorioExportacao 'C:\caminho\privado'`. Para lançamento descartável, acrescente `-GravarTeste` ou `-CriarContagemTeste` com a conta desenvolvedora; para testar a planilha-modelo local, acrescente `-ImportarTeste -PlanilhaTeste 'C:\caminho\FPA - MODELO.xlsx'`. Com gerente, `-GravarGerenteTeste` pede no terminal uma conta desenvolvedora de teste não associada. Com administrador, `-GravarUniversalTeste` testa a criação pela ferramenta universal. Os scripts verificam a limpeza e mantêm a auditoria; não os execute sobre registros de produção. Não cole a senha no comando nem no chat. Os fatores de PF além dos já capturados continuam sujeitos à confirmação da regra oficial do AgilePoint.
 
-Após as verificações, `npm run package:release` gera `agilepoint-mcp-VERSAO.zip` no diretório pai e imprime seu SHA-256. A distribuição usa uma lista fechada: programa compilado, manifesto/lock somente de execução, configuração sem credenciais, política padrão, aprovação/diagnóstico, modelo XLSX do kit e documentação de usuário de `docs/`. Fontes, fixtures, testes, scripts de desenvolvimento, `COBERTURA_PENDENTE.md` e `INSTRUCOES_OUTRO_CHAT.md` permanecem apenas na pasta de desenvolvimento. O ZIP é conferido contra a lista antes de ser entregue. Se já existir um ZIP com a mesma versão, a geração é recusada.
+Após as verificações, `npm run package:release` gera `agilepoint-mcp-VERSAO.zip` no diretório pai e imprime seu SHA-256. A distribuição usa uma lista fechada: programa compilado, manifesto/lock somente de execução, configuração sem credenciais, política padrão, aprovação/diagnóstico, documentação de usuário de `docs/`. Fontes, fixtures, testes, scripts de desenvolvimento, `COBERTURA_PENDENTE.md` e `INSTRUCOES_OUTRO_CHAT.md` permanecem apenas na pasta de desenvolvimento. O ZIP é conferido contra a lista antes de ser entregue. Se já existir um ZIP com a mesma versão, a geração é recusada.
 
 ## Autenticação pelo chat (credenciais opcionais na instalação)
 
@@ -126,7 +125,7 @@ Instale o servidor MCP por STDIO sem `APF_USERNAME` e `APF_PASSWORD`. Na convers
 
 **Atenção:** ao digitar a senha no chat, o cliente de IA pode guardá-la no histórico e nos registros das chamadas de ferramenta. O MCP não controla essa retenção. Use esse modo somente em cliente aprovado pela organização, com histórico e acesso adequadamente protegidos. Em ambientes que não possam aceitar esse risco, mantenha a configuração privada de credenciais fora do chat. Nunca peça nem repita a senha na resposta do MCP.
 
-O login por chat dispensa a configuração individual de credenciais, mas não substitui as políticas da instalação. O administrador do pacote ainda define `APF_CAPABILITIES_FILE` para habilitar escrita padrão de desenvolvedor/gerente e os diretórios privados de auditoria/aprovação. Após login por chat, `APF_WRITE_ENABLED` passa a `true` se estava indefinido; uma configuração explícita `false` permanece bloqueada. O modo de aprovação continua `external` por padrão. Ações personalizadas e uploads continuam dependendo de contratos homologados.
+O login por chat dispensa a configuração individual de credenciais, mas não substitui as políticas da instalação. O administrador do pacote ainda define `APF_CAPABILITIES_FILE` para habilitar escrita padrão de desenvolvedor/gerente e os diretórios privados de auditoria/aprovação. Após login por chat, `APF_WRITE_ENABLED` passa a `true` se estava indefinido; uma configuração explícita `false` permanece bloqueada. O instalador configura `automatic`; configurações de aprovação explícitas continuam disponíveis. Ações personalizadas e uploads continuam dependendo de contratos homologados.
 
 ## Variáveis
 
@@ -138,7 +137,7 @@ APF_MCP_ROLE=desenvolvedor
 APF_COLLABORATOR_ID=id_estavel_do_usuario
 APF_COLLABORATOR_NAME=nome_do_usuario
 APF_WRITE_ENABLED=false
-APF_WRITE_APPROVAL_MODE=external
+APF_WRITE_APPROVAL_MODE=automatic
 APF_AUDIT_DIR=C:\diretorio-privado\auditoria
 APF_APPROVAL_DIR=C:\diretorio-privado\aprovacoes
 APF_UPLOAD_DIR=C:\diretorio-restrito\uploads
@@ -172,7 +171,7 @@ Se a política da organização permitir que os perfis **desenvolvedor** e **ger
 
 Não conceda `include`, `edit` ou `delete` a um perfil apenas porque o botão aparece na tela. Valide a permissão real da conta e aprove cada capacidade/formulário separadamente. No modo de credenciais por ambiente, o responsável pela instalação deve configurar `APF_COLLABORATOR_ID` para lançar PF; no login pelo chat, o MCP usa o login autenticado como identidade estável de auditoria, sem apresentá-lo como ID numérico do cadastro do AgilePoint. Evite armazenar `APF_PASSWORD` em texto puro no arquivo de configuração do cliente de IA; use um mecanismo privado de credenciais do ambiente.
 
-O padrão `APF_WRITE_APPROVAL_MODE=external` exige aprovação humana fora do canal controlado pela IA. A simulação cria uma solicitação em `APF_APPROVAL_DIR`; o comando local mostra a prévia canônica completa e só aprova quando a pessoa digita a confirmação que contém o ID:
+A política opcional `APF_WRITE_APPROVAL_MODE=external` exige aprovação humana fora do canal controlado pela IA. A simulação cria uma solicitação em `APF_APPROVAL_DIR`; o comando local mostra a prévia canônica completa e só aprova quando a pessoa digita a confirmação que contém o ID:
 
 ```powershell
 $env:APF_APPROVAL_DIR='C:\diretorio-privado\aprovacoes'
@@ -183,7 +182,7 @@ A aprovação é vinculada ao usuário, à operação e ao hash integral da simu
 
 Para permitir que um pedido à IA crie contagens ou edite registros sem voltar ao terminal, configure **na instalação individual** `APF_WRITE_APPROVAL_MODE=delegated` e `APF_WRITE_ENABLED=true`. Reinicie o cliente MCP. A IA chama a simulação e, se ela for válida, chama a ferramenta de execução com `confirmacao_token` e `chave_idempotencia`, sem `aprovacao_id`. Essa delegação é uma decisão explícita do responsável pela instalação; texto encontrado em telas ou relatórios não deve ser tratado pela IA como autorização do usuário. O MCP não consegue comprovar sozinho que uma chamada de ferramenta veio de um pedido humano direto. Por isso, use conta individual com acesso mínimo, capacidades locais limitadas, auditoria privada e homologação prévia. O AgilePoint continua negando ações não permitidas à conta.
 
-Mesmo em `delegated`, exclusões e ações personalizadas marcadas como destrutivas exigem aprovação externa. `associar_usuarios_funcoes` também exige aprovação externa, pois substitui as associações atuais em lote. Não há opção para delegar essas operações destrutivas nesta versão.
+Mesmo em `delegated`, exclusões e ações personalizadas marcadas como destrutivas exigem aprovação externa. `associar_usuarios_funcoes` também exige aprovação externa, pois substitui as associações atuais em lote. O modo `automatic`, configurado pelo instalador 1.2.1, permite executar também essas operações após a simulação interna e o comando do usuário, sem confirmação adicional.
 
 Para aprovar **na interface da IA, sem terminal**, configure `APF_WRITE_APPROVAL_MODE=elicitation`, `APF_TRUSTED_CLIENT_ELICITATION=true` e `APF_WRITE_ENABLED=true` na instalação individual; depois reinicie o cliente MCP. A IA simula e chama a execução **sem** `aprovacao_id`. O servidor envia ao cliente uma solicitação de confirmação de formulário com a prévia integral (até 12.000 caracteres), operação e SHA-256. A pessoa precisa digitar a frase exibida. Recusa, cancelamento, frase incorreta, prévia divergente ou cliente sem suporte a `elicitation.form` bloqueiam a gravação. A confirmação vale somente para a execução atual; a simulação e a chave de idempotência continuam obrigatórias. Prévia maior que o limite exige o modo `external`.
 
@@ -314,7 +313,7 @@ Em `delegated`, para uma criação ou edição não destrutiva, a simulação re
 
 Em `elicitation`, a simulação retorna `requer_aprovacao_humana: true` sem `aprovacao_id`. A IA chama a execução com `confirmacao_token` e `chave_idempotencia`; o próprio cliente MCP apresenta a prévia e solicita a confirmação. Isso também se aplica às exclusões, desde que o cliente seja confiável e tenha suporte ao formulário interativo.
 
-Para alterar ou excluir um registro específico, informe `registro_id` na simulação. Na tela **Funcionalidade**, a exclusão também exige `titulo_esperado` igual ao título publicado para o ID; o MCP relê o registro e pesquisa a grade antes e depois da operação. Exclusões nunca usam o modo `delegated`: em `external`, a pessoa aprova com `npm run approve -- ID_DA_APROVACAO`; em `elicitation`, confirma no formulário apresentado pelo cliente MCP. Um HTTP 200 sem desaparecimento confirmado do registro é tratado como falha, sem repetição automática.
+Para alterar ou excluir um registro específico, informe `registro_id` na simulação. Na tela **Funcionalidade**, a exclusão também exige `titulo_esperado` igual ao título publicado para o ID; o MCP relê o registro e pesquisa a grade antes e depois da operação. Em `automatic`, exclusões solicitadas pelo usuário executam após validação sem confirmação extra. Exclusões nunca usam o modo `delegated`: em `external`, a pessoa aprova com `npm run approve -- ID_DA_APROVACAO`; em `elicitation`, confirma no formulário apresentado pelo cliente MCP. Um HTTP 200 sem desaparecimento confirmado do registro é tratado como falha, sem repetição automática.
 
 ```json
 {
@@ -376,3 +375,11 @@ O ranking do repositório retorna a nota e a ordem definidas pela regra do Agile
 ## Cobertura
 
 A camada universal cobre controles HTML e componentes comuns do Webrun: campos, selects, checkboxes, botões, links, abas, grades, uploads e downloads. Componentes totalmente customizados podem exigir um adaptador específico; nesses casos, adicione uma ferramenta especializada sem remover as proteções universais.
+
+## Configuração inicial conforme a operação
+
+Depois de conectar, a IA solicita somente Usuário e Senha ainda ausentes, autentica e pergunta “O que você deseja fazer no AgilePoint?”. Se a tarefa já tiver sido informada, aproveita o pedido. A autenticação aceita `objetivo` opcional e exige somente as credenciais. Projeto e Sprint são solicitados apenas quando necessários para uma operação de Contagem, sem bloquear Dica de Mestre, consultas ou alterações em outras telas. O contexto em memória é opcional. A importação por planilha preenchida é preservada e não exige o kit removido. Veja o roteiro em `docs/README_TESTADORES.md`.
+
+## Atualização e diagnóstico 1.2.1
+
+O instalador reconhece instalações verificadas, incluindo 1.0.0 sem marcador, preserva dados e políticas personalizadas e não duplica conexões antigas conflitantes. Windows usa Instalar.ps1; macOS/Linux usam Node 22+ e npm com `node instalar.mjs --cliente detectar`. Após reconectar, `diagnosticar_configuracao` deve confirmar a versão 1.2.1. O diagnóstico distingue política local, recusa identificada do AgilePoint, transporte e origem indeterminada, sem retornar credenciais. Veja o roteiro em docs/README_TESTADORES.md e os limites em docs/RELEASE_1.2.1.md.

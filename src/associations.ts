@@ -20,6 +20,7 @@ export type AssociationInput = {
 };
 
 export type AssociationSimulation = AssociationInput & {
+  alvos_verificados?: { contagem_id: string; funcoes: Array<{ id: string; nome: string; associacoes_atuais: Array<{ userId: string; percentage: number }> }>; usuarios: Array<{ userId: string; percentage: number }> };
   colaborador_id: string | null;
   colaborador_nome: string | null;
   quantidade_funcoes_solicitadas: number | "todas";

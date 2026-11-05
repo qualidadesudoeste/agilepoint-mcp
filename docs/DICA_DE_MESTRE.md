@@ -1,10 +1,10 @@
-# Dica de Mestre pelo MCP — versão 1.2.0
+# Dica de Mestre pelo MCP — versão 1.2.1
 
 O fluxo usa os endpoints internos equivalentes a **Incluir Nova → Submeter Inscrição**. A publicação segue a avaliação do AgilePoint: o MCP não concede aprovação, não altera o avaliador e não força a visibilidade no catálogo.
 
 ## Como pedir à IA
 
-> Quero enviar uma Dica de Mestre com o título “Minha solução”, esta descrição e a documentação Markdown anexada. Inclua também estes arquivos de apoio. Mostre a prévia e solicite a aprovação necessária antes de enviar.
+> Quero enviar uma Dica de Mestre com o título “Minha solução”, esta descrição e a documentação Markdown anexada. Inclua também estes arquivos de apoio. Valide os dados e envie conforme meu pedido.
 
 A IA deve pedir título, descrição e documentação quando faltarem, aproveitar os dados já fornecidos e esclarecer o conteúdo. Ela não precisa clicar nos botões da tela nem receber permissão genérica para executar regras arbitrárias.
 
@@ -34,9 +34,12 @@ Título admite até 250 caracteres; descrição, 4.000. A documentação é obri
 
 ## Aprovação, permissões e segurança
 
-A conta precisa acessar Dica de Mestre e suas ações no próprio AgilePoint. O instalador 1.2.0 inclui a capacidade local `publicar_dica_mestre` somente para o formulário `500000385`, nos perfis desenvolvedor e gerente. Isso não concede acesso adicional no sistema nem libera `custom_action` ou uploads universais em outros formulários. Instalações com política própria precisam autorizar essa capacidade explicitamente após conferir o acesso da conta. Atualize e reinicie a conexão MCP antes de usar as novas ferramentas.
+A instalação 1.2.1 usa o modo automatic: a IA simula e executa o comando do usuário sem pedir confirmação adicional. A aprovação editorial do AgilePoint continua independente. Modos external/elicitation configurados explicitamente mantêm seus controles.
 
-O modo de aprovação configurado é preservado. A execução confere o contrato e os hashes dos arquivos novamente; alterações exigem nova simulação. As chamadas são serializadas para impedir que o GUID de um envio interfira em outro dentro do mesmo processo MCP. Use conta e processo individuais.
+
+A conta precisa acessar Dica de Mestre e suas ações no próprio AgilePoint. O instalador 1.2.1 inclui a capacidade local `publicar_dica_mestre` somente para o formulário `500000385`, nos perfis desenvolvedor e gerente. Isso não concede acesso adicional no sistema nem libera `custom_action` ou uploads universais em outros formulários. Instalações com política própria precisam autorizar essa capacidade explicitamente após conferir o acesso da conta. Atualize e reinicie a conexão MCP antes de usar as novas ferramentas.
+
+Na execução, respeita-se o modo configurado na conexão ativa. A execução confere o contrato e os hashes dos arquivos novamente; alterações exigem nova simulação. As chamadas são serializadas para impedir que o GUID de um envio interfira em outro dentro do mesmo processo MCP. Use conta e processo individuais.
 
 Títulos já existentes nas suas inscrições bloqueiam novo envio; esclareça a intenção antes de criar outro título para contornar isso. Idempotência persistente impede reaproveitar a mesma chave com outro conteúdo. Um resultado incerto nunca deve ser repetido automaticamente, nem com outra chave.
 
