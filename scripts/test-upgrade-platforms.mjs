@@ -99,6 +99,13 @@ try {
   const stockRegistration = (await inspectRegistrations({ mcpServers: { agilepoint: restrictedEntry } })).verified;
   const newEntry = runtimeConfiguration(destination, path.join(root, "dados-novos"));
   assert.equal(migratedConfiguration(newEntry, stockRegistration).env.APF_CAPABILITIES_FILE, path.join(destination, "capabilities.json"));
+  const policyText = (await readFile("capabilities.developer-all-accessible.example.json", "utf8")).replace(/\r\n/g, "\n");
+  for (const text of [policyText.replace(/\n/g, "\r\n"), "\uFEFF" + policyText]) {
+    await writeFile(restrictedPolicy, text);
+    const normalized = (await inspectRegistrations({ mcpServers: { agilepoint: restrictedEntry } })).verified;
+    assert.equal(normalized[0].stockPolicy, true, "reconhecer política padrão com CRLF ou BOM sem ampliar uma política personalizada");
+    assert.equal(migratedConfiguration(newEntry, normalized).env.APF_CAPABILITIES_FILE, path.join(destination, "capabilities.json"));
+  }
   stockRegistration[0].entry.enabled = false;
   const disabledEntry = migratedConfiguration(newEntry, stockRegistration);
   assert.equal(disabledEntry.disabled, true);

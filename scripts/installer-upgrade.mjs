@@ -32,7 +32,8 @@ export async function inspectRegistrations(document) {
       let stockPolicy = false;
       if (entry.env?.APF_CAPABILITIES_FILE && path.resolve(entry.env.APF_CAPABILITIES_FILE) === path.join(root, "capabilities.json")) {
         try {
-          const hash = createHash("sha256").update(await regularText(entry.env.APF_CAPABILITIES_FILE)).digest("hex");
+          const policyText = (await regularText(entry.env.APF_CAPABILITIES_FILE)).replace(/^\uFEFF/, "").replace(/\r\n/g, "\n");
+          const hash = createHash("sha256").update(policyText).digest("hex");
           stockPolicy = ["0ea426979d6c7b8820843ad67e2b6861f502e548e83498eba23aa92f32fcf6ed", "11b67054a466d3a3244a759aafbba2b17d30ea7aad37838abc353590a922f664"].includes(hash);
         } catch { /* Não ampliar acesso quando a política antiga não puder ser validada. */ }
       }
